@@ -1,0 +1,74 @@
+name: Release build
+
+# Entry point for releases. It only decides *what* to build and in which
+# order; each stage lives in its own reusable workflow:
+#
+#   release-verify.yml   tests, lint and typecheck
+#   release-package.yml  builds the Chrome and Firefox packages + checksums
+#   release-publish.yml  attaches the packages to the GitHub release
+#
+# Tags look like v0.1.0-beta.1 (beta) or v1.0.0 (stable). Beta tags also mark
+# the release as a pre-release. See docs/releasing.md for the full flow.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag to (re)build, e.g. v0.1.0-beta.1'
+        required: true
+
+# Least privilege by default; only the publish stage may write.
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  meta:
+    name: Resolve tag and version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      version: ${{ steps.resolve.outputs.version }}
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - name: Validate tag and derive version
+        id: resolve
+        run: |
+          VERSION="${TAG#v}"
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$ ]]; then
+            echo "::error::Tag '$TAG' must look like v1.2.3 or v1.2.3-beta.4"
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+  verify:
+    name: Verify
+    needs: meta
+    uses: ./.github/workflows/release-verify.yml
+    with:
+      tag: ${{ needs.meta.outputs.tag }}
+
+  package:
+    name: Package
+    needs: [meta, verify]
+    uses: ./.github/workflows/release-package.yml
+    with:
+      tag: ${{ needs.meta.outputs.tag }}
+      version: ${{ needs.meta.outputs.version }}
+
+  publish:
+    name: Publish
+    needs: [meta, package]
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release-publish.yml
+    with:
+      tag: ${{ needs.meta.outputs.tag }}
+      version: ${{ needs.meta.outputs.version }}

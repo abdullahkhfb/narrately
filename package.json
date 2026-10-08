@@ -1,0 +1,39 @@
+{
+  "name": "narrately",
+  "version": "0.1.0-beta.1",
+  "private": true,
+  "description": "Local-first novel narration extension for Chrome and Firefox using Kokoro-82M, TypeScript, and a Rust/WASM core.",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build:wasm": "wasm-pack build crates/narrately-core --target web --out-dir ../../src/wasm/pkg --release --out-name narrately_core",
+    "build:ts": "node scripts/build-ts.mjs",
+    "build": "npm run build:wasm && npm run build:ts",
+    "package": "npm run prepare-assets && npm run build && node scripts/package-extension.mjs",
+    "package:firefox": "npm run package -- --browser=firefox",
+    "package:chrome": "npm run package -- --browser=chrome",
+    "sync-model": "node scripts/sync-model.mjs",
+    "sync-voices": "node scripts/sync-model.mjs --voices-only",
+    "smoke:model": "node scripts/smoke-model.mjs",
+    "lint:rust": "cargo fmt --all -- --check && cargo clippy --workspace --all-targets --all-features -- -D warnings",
+    "test:rust": "cargo test --workspace",
+    "prepare-assets": "node scripts/sync-model.mjs --voices-only",
+    "zip": "node scripts/zip-release.mjs"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "4.3.1",
+    "kokoro-js": "1.2.1",
+    "webextension-polyfill": "0.12.0"
+  },
+  "devDependencies": {
+    "@types/webextension-polyfill": "0.12.6",
+    "typescript": "5.9.3",
+    "vite": "8.3.3",
+    "wasm-pack": "0.15.0"
+  },
+  "overrides": {
+    "kokoro-js": {
+      "@huggingface/transformers": "4.3.1"
+    }
+  }
+}

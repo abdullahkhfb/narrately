@@ -1,0 +1,15 @@
+node_modules/
+dist/
+release/
+target/
+crates/*/target/
+.DS_Store
+*.log
+smoke-test-output.wav
+models/onnx-community/Kokoro-82M-ONNX/*
+!models/onnx-community/Kokoro-82M-ONNX/README.md
+!models/onnx-community/Kokoro-82M-ONNX/REVISION.txt
+src/wasm/pkg/*
+!src/wasm/pkg/.gitkeep
+!src/wasm/pkg/README.md
+!src/wasm/pkg/narrately_core.d.ts

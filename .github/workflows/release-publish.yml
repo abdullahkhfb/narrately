@@ -1,0 +1,43 @@
+name: Release / publish
+
+# Reusable stage: downloads the packaged files and attaches them to the
+# GitHub release. Beta versions are also marked as a pre-release.
+# Called by release.yml.
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: 'Release tag to attach the files to'
+        required: true
+        type: string
+      version:
+        description: 'Version derived from the tag, without the leading v'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TAG: ${{ inputs.tag }}
+      VERSION: ${{ inputs.version }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: narrately-${{ inputs.version }}
+          path: release
+
+      - name: Attach to the release
+        run: |
+          ls -la release
+          gh release upload "$TAG" \
+            release/narrately-*.zip release/SHA256SUMS.txt --clobber
+          if [[ "$VERSION" == *-beta.* ]]; then
+            gh release edit "$TAG" --prerelease
+          fi

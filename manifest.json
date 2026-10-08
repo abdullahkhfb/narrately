@@ -1,0 +1,59 @@
+{
+  "manifest_version": 3,
+  "name": "Narrately — Local Novel Narrator",
+  "description": "Read novels locally with Kokoro-82M. No cloud TTS, no API keys.",
+  "minimum_chrome_version": "121",
+  "permissions": [
+    "storage",
+    "unlimitedStorage"
+  ],
+  "host_permissions": [
+    "https://huggingface.co/*",
+    "https://*.huggingface.co/*",
+    "https://*.hf.co/*"
+  ],
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "action": {
+    "default_popup": "src/popup/index.html",
+    "default_title": "Narrately",
+    "default_icon": {
+      "16": "src/icons/toolbar/icon16.png",
+      "48": "src/icons/toolbar/icon48.png",
+      "128": "src/icons/toolbar/icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "src/content.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "icons": {
+    "16": "src/icons/toolbar/icon16.png",
+    "48": "src/icons/toolbar/icon48.png",
+    "128": "src/icons/toolbar/icon128.png"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "src/inference/host.html"
+      ],
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ]
+    }
+  ]
+}

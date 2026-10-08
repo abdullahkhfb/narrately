@@ -1,0 +1,67 @@
+name: Release / package
+
+# Reusable stage: builds the Chrome and Firefox packages, zips them together
+# with the source archive, writes SHA256SUMS.txt and uploads everything as a
+# workflow artifact for the publish stage. Called by release.yml.
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: 'Release tag to build'
+        required: true
+        type: string
+      version:
+        description: 'Version derived from the tag, without the leading v'
+        required: true
+        type: string
+    outputs:
+      artifact:
+        description: 'Name of the uploaded workflow artifact'
+        value: ${{ jobs.package.outputs.artifact }}
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      artifact: narrately-${{ inputs.version }}
+    env:
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      # package.json is the version source for local builds, so align it
+      # with the tag before anything reads it.
+      - name: Apply version from tag
+        run: npm version "$VERSION" --no-git-tag-version --allow-same-version
+
+      - uses: ./.github/actions/setup-toolchain
+
+      # Bundles the voice packs, builds Rust/WASM + TypeScript, and prepares
+      # release/chrome. The model itself is downloaded by users in the UI.
+      - name: Build Chrome package
+        run: npm run package:chrome
+
+      - name: Build Firefox package
+        run: node scripts/package-extension.mjs --browser=firefox
+
+      - name: Zip packages, source and checksums
+        run: |
+          npm run zip
+          git archive --format=zip --prefix="narrately-${VERSION}/" \
+            -o "release/narrately-${VERSION}-src.zip" HEAD
+          (cd release && sha256sum narrately-*.zip > SHA256SUMS.txt)
+          ls -la release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: narrately-${{ inputs.version }}
+          path: |
+            release/narrately-*.zip
+            release/SHA256SUMS.txt
+          if-no-files-found: error

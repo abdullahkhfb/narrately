@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Narrately inference host</title>
+</head>
+<body>
+  <!-- Hidden bridge page: runs on the extension origin so it may create
+       the module inference worker, which page-context content scripts
+       cannot do themselves. -->
+  <script type="module" src="./host.ts"></script>
+</body>
+</html>

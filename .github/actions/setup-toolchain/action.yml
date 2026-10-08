@@ -1,0 +1,30 @@
+name: Set up toolchain
+description: >
+  Installs Node.js and Rust (with the wasm32 target), restores caches and runs
+  `npm ci`. Run actions/checkout first so this action and the lockfiles exist.
+
+inputs:
+  node-version:
+    description: Node.js major version
+    default: '22'
+  rust-targets:
+    description: Extra Rust targets to install
+    default: wasm32-unknown-unknown
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: npm
+
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ inputs.rust-targets }}
+
+    - uses: Swatinem/rust-cache@v2
+
+    - name: Install npm dependencies
+      shell: bash
+      run: npm ci
