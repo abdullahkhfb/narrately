@@ -2,8 +2,10 @@
  * @fileoverview Content-side client for the hidden inference host iframe.
  */
 
-import {extensionUrl} from '../shared/browser';
+import {browser, extensionUrl} from '../shared/browser';
+import {isDebugErrorRecord} from '../shared/debugErrors';
 import type {
+  DebugErrorRecord,
   ModelStatusMessage,
   NarrateMessage,
   ProgressMessage,
@@ -62,7 +64,18 @@ export function createHostClient(): HostClient {
     if (event.source !== frame.contentWindow) {
       return;
     }
-    const message = event.data;
+    const message: unknown = event.data;
+    if (isHostDebugErrorMessage(message)) {
+      void browser.runtime
+        .sendMessage({type: 'report_debug_error', error: message.error})
+        .catch(() => {
+          // A reloaded extension invalidates the page's content-script context.
+        });
+      return;
+    }
+    if (!isWorkerMessage(message)) {
+      return;
+    }
     if (!('jobId' in message) || !message.jobId) {
       return;
     }
@@ -142,6 +155,60 @@ export function createHostClient(): HostClient {
       return {cancel: job.cancel, promise: job.promise.then(() => undefined)};
     },
   };
+}
+
+function isHostDebugErrorMessage(
+  value: unknown,
+): value is {type: 'narrately_debug_error'; error: DebugErrorRecord} {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'type' in value &&
+    value.type === 'narrately_debug_error' &&
+    'error' in value &&
+    isDebugErrorRecord(value.error)
+  );
+}
+
+function isWorkerMessage(value: unknown): value is WorkerMessage {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  switch (record['type']) {
+    case 'ready':
+      return Array.isArray(record['voices']);
+    case 'progress':
+      return (
+        typeof record['jobId'] === 'string' &&
+        typeof record['completed'] === 'number' &&
+        typeof record['total'] === 'number' &&
+        (record['phase'] === 'loading' ||
+          record['phase'] === 'synthesizing' ||
+          record['phase'] === 'merging' ||
+          record['phase'] === 'done')
+      );
+    case 'result':
+      return (
+        typeof record['jobId'] === 'string' &&
+        record['audio'] instanceof ArrayBuffer &&
+        typeof record['durationMs'] === 'number'
+      );
+    case 'error':
+      return (
+        typeof record['message'] === 'string' &&
+        (record['jobId'] === undefined || typeof record['jobId'] === 'string')
+      );
+    case 'debug_error':
+      return isDebugErrorRecord(record['error']);
+    case 'model_status':
+      return (
+        typeof record['jobId'] === 'string' &&
+        typeof record['installed'] === 'boolean'
+      );
+    default:
+      return false;
+  }
 }
 
 function randomJobId(): string {

@@ -1,8 +1,9 @@
 # Adding a supported site
 
 Narrately finds books and chapters through **site adapters**. Each adapter knows
-the markup of one website. [Lnori](https://lnori.com) is the only official
-adapter today; every other page goes through a best-effort generic fallback.
+the markup of one website. [Lnori](https://lnori.com), [Cyrisia](https://cyrisia.com/) and
+[Novel Archive](https://novelarchive.cc/) are the official adapters today;
+every other page goes through a best-effort generic fallback.
 
 ## How detection works
 
@@ -34,10 +35,14 @@ src/content/sites/
 ├── types.ts     the SiteAdapter interface
 ├── text.ts      shared helpers: normalize, cleanTitle, readParagraphs
 ├── lnori.ts     official adapter
+├── cyrisia.ts   official adapter (reads chapter pages and same-origin iframes)
+├── novelarchive.ts official adapter (reads the current chapter page)
 └── generic.ts   best-effort fallback (never listed in SITE_ADAPTERS)
 docs/assets/sites/
 ├── lnori.svg        site logo for the README (dark artwork)
-└── lnori-white.svg  same logo for dark color schemes
+├── lnori-white.svg  same logo for dark color schemes
+├── cyrisia.png      site logo
+└── novelarchive.png site logo
 ```
 
 ## The contract
@@ -76,7 +81,7 @@ flowchart LR
 1. **Add the id.** In `src/shared/types.ts`, extend the union:
 
    ```ts
-   export type SiteId = 'lnori' | 'example' | 'generic';
+   export type SiteId = 'lnori' | 'cyrisia' | 'novelarchive' | 'example' | 'generic';
    ```
 
 2. **Write the adapter** in `src/content/sites/example.ts`:
@@ -118,7 +123,8 @@ flowchart LR
    ```
 
 4. **Add the logo and a README row.**
-   - Save the logo as `docs/assets/sites/example.svg`. If it is dark, also add
+   - Save the logo as `docs/assets/sites/example.svg` (or `.png` when the
+     site only provides a bitmap). If it is dark, also add
      `example-white.svg` for dark color schemes. Keep the original artwork
      unmodified and only recolor for the dark variant.
    - Add a row to the "Supported websites" table in the main

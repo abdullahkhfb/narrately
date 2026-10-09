@@ -4,6 +4,15 @@
 
 import type {NarrationSettings} from './types';
 
+export interface DebugErrorRecord {
+  timestamp: string;
+  source: string;
+  message: string;
+  level?: 'error' | 'warning';
+  stack?: string;
+  location?: string;
+}
+
 export interface GetSettingsMessage {
   type: 'get_settings';
 }
@@ -21,11 +30,22 @@ export interface OpenPanelMessage {
   type: 'open_panel';
 }
 
+export interface ReportDebugErrorMessage {
+  type: 'report_debug_error';
+  error: DebugErrorRecord;
+}
+
+export interface GetDebugErrorsMessage {
+  type: 'get_debug_errors';
+}
+
 export type BackgroundMessage =
   | GetSettingsMessage
   | SetSettingsMessage
   | GetVoiceCatalogMessage
-  | OpenPanelMessage;
+  | OpenPanelMessage
+  | ReportDebugErrorMessage
+  | GetDebugErrorsMessage;
 
 export interface SynthesizeMessage {
   type: 'synthesize';
@@ -118,6 +138,11 @@ export interface ErrorMessage {
   message: string;
 }
 
+export interface DebugErrorMessage {
+  type: 'debug_error';
+  error: DebugErrorRecord;
+}
+
 /** Host -> content script: model availability (also ends a download). */
 export interface ModelStatusMessage {
   type: 'model_status';
@@ -130,4 +155,5 @@ export type WorkerMessage =
   | ReadyMessage
   | ProgressMessage
   | ResultMessage
-  | ErrorMessage;
+  | ErrorMessage
+  | DebugErrorMessage;

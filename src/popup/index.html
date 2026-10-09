@@ -12,20 +12,37 @@
     <div><strong>Narrately <span class="beta" id="beta" hidden>Beta</span></strong><small id="version">Local novel narrator</small></div>
   </header>
   <main>
-    <button id="open" class="primary">Open narrator on this page</button>
-    <p id="status" role="status" aria-live="polite"></p>
-    <hr>
-    <label>Voice<select id="voice"></select></label>
-    <label>Speed <output id="speed-out">1.00×</output>
-      <input id="speed" type="range" min="0.6" max="1.6" step="0.05" value="1"></label>
-    <label>Device
-      <select id="device">
-        <option value="wasm">WASM (compatible)</option>
-        <option value="webgpu">WebGPU (faster; needs a 312 MB model)</option>
-      </select>
-    </label>
-    <label class="check"><input id="cache" type="checkbox" checked> Cache generated audio on this device</label>
-    <button id="save">Save settings</button>
+    <section id="settings-view">
+      <button id="open" class="primary">Open narrator on this page</button>
+      <p id="status" role="status" aria-live="polite"></p>
+      <hr>
+      <label>Voice<select id="voice"></select></label>
+      <label>Speed <output id="speed-out">1.00×</output>
+        <input id="speed" type="range" min="0.6" max="1.6" step="0.05" value="1"></label>
+      <label>Device
+        <select id="device">
+          <option value="wasm">WASM (compatible)</option>
+          <option value="webgpu">WebGPU (faster; needs a 312 MB model)</option>
+        </select>
+      </label>
+      <label class="check"><input id="cache" type="checkbox" checked> Cache generated audio on this device</label>
+      <button id="save">Save settings</button>
+      <nav class="support-links" aria-label="Help and project links">
+        <a
+          class="support-button"
+          href="https://github.com/abdullahkhfb/narrately/issues/new?template=bug_report.yml"
+          target="_blank"
+          rel="noopener noreferrer"
+        >Report a bug</a>
+        <button id="debug-open" class="support-button" type="button">Debug</button>
+      </nav>
+      <a
+        class="source-link"
+        href="https://github.com/abdullahkhfb/narrately"
+        target="_blank"
+        rel="noopener noreferrer"
+      >Source code on GitHub</a>
+    </section>
   </main>
   <script type="module" src="./index.ts"></script>
 </body>

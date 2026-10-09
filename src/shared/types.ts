@@ -7,7 +7,7 @@ export type InferenceDevice = 'wasm' | 'webgpu';
 export type VoiceKind = 'preset' | 'local_embedding';
 
 /** Which site adapter produced a book. Add a member per supported site. */
-export type SiteId = 'lnori' | 'generic';
+export type SiteId = 'lnori' | 'cyrisia' | 'novelarchive' | 'generic';
 
 export interface VoiceProfile {
   /** Stable model voice identifier. */

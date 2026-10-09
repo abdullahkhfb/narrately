@@ -83,4 +83,6 @@ at the core boundary, while UI-only DOM helpers may stay `camelCase`. Comments
 are short and explain intent, not syntax.
 
 The generated files in `src/wasm/pkg/` (except `narrately_core.d.ts` and the
-README) are git-ignored; regenerate them with `npm run build:wasm`.
+README) are git-ignored; regenerate them with `npm run build:wasm`. wasm-pack also
+writes a `.gitignore` containing `*` into that folder; the build script deletes it
+so the repository keeps a single root `.gitignore`.

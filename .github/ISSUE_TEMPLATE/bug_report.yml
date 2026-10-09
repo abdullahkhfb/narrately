@@ -1,0 +1,48 @@
+name: Bug report
+description: Report a problem with Narrately
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Narrately. Please don't include private chapter text, credentials, or other sensitive information.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the problem and what you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open ...
+        2. Click ...
+        3. See the problem
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and version
+      placeholder: Chrome 140, Firefox 143, etc.
+    validations:
+      required: true
+  - type: input
+    id: extension-version
+    attributes:
+      label: Narrately version
+      placeholder: 0.1.0-beta.2
+    validations:
+      required: true
+  - type: textarea
+    id: debug-details
+    attributes:
+      label: Relevant errors or debug details
+      description: Use Narrately's Debug button to copy captured Narrately logs, then paste them here. Review and remove private or sensitive information before sharing.
+    validations:
+      required: false

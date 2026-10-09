@@ -6,20 +6,21 @@
  */
 
 import type {Book} from '../../shared/types';
+import {cyrisiaAdapter} from './cyrisia';
 import {genericAdapter} from './generic';
 import {lnoriAdapter} from './lnori';
+import {novelArchiveAdapter} from './novelarchive';
+import {hostMatches} from './text';
 import type {SiteAdapter} from './types';
 
 export type {SiteAdapter} from './types';
 
 /** Officially supported sites. Order only matters between host-less ties. */
-export const SITE_ADAPTERS: readonly SiteAdapter[] = [lnoriAdapter];
-
-/** True when `hostname` is `host` or one of its subdomains. */
-export function hostMatches(hostname: string, host: string): boolean {
-  const name = hostname.toLowerCase();
-  return name === host || name.endsWith(`.${host}`);
-}
+export const SITE_ADAPTERS: readonly SiteAdapter[] = [
+  lnoriAdapter,
+  cyrisiaAdapter,
+  novelArchiveAdapter,
+];
 
 /**
  * Detects the best available book on the page.

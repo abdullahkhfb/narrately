@@ -24,3 +24,9 @@ export function readParagraphs(root: Element): string[] {
     .map((node) => normalize(node.textContent))
     .filter((text) => text.length > 0 && !JUNK_PATTERN.test(text));
 }
+
+/** True when `hostname` is `host` or one of its subdomains. */
+export function hostMatches(hostname: string, host: string): boolean {
+  const name = hostname.toLowerCase();
+  return name === host || name.endsWith(`.${host}`);
+}

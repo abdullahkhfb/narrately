@@ -1,12 +1,12 @@
 {
   "name": "narrately",
-  "version": "0.1.0-beta.1",
+  "version": "0.1.0-beta.2",
   "private": true,
   "description": "Local-first novel narration extension for Chrome and Firefox using Kokoro-82M, TypeScript, and a Rust/WASM core.",
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "build:wasm": "wasm-pack build crates/narrately-core --target web --out-dir ../../src/wasm/pkg --release --out-name narrately_core",
+    "build:wasm": "wasm-pack build crates/narrately-core --target web --out-dir ../../src/wasm/pkg --release --out-name narrately_core && node scripts/clean-wasm-pkg.mjs",
     "build:ts": "node scripts/build-ts.mjs",
     "build": "npm run build:wasm && npm run build:ts",
     "package": "npm run prepare-assets && npm run build && node scripts/package-extension.mjs",

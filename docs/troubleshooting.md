@@ -17,7 +17,7 @@
 
 | Symptom | Likely cause and fix |
 | --- | --- |
-| Panel never appears | Lnori is the only officially supported site; elsewhere the generic fallback may find nothing (it needs at least 400 characters of paragraph text and low link density). Test with a [sample page](testing.md#prepare-a-test-page) and check the extension's *Errors* page |
+| Panel never appears | The page may not have enough readable text, or its site may not be supported. Test a supported [sample page](testing.md#prepare-a-test-page) and check the extension's *Errors* page |
 | Popup says "Narrately cannot run here" | The tab has no content script (browser-internal page, or the tab was open before the extension loaded). Reload the page |
 | Popup says "No readable chapter text found on this page" | The detector found nothing to narrate (expected on unsupported sites); see [chapter detection](architecture.md#chapter-detection) |
 | Generate is disabled | The voice model is not installed. Use **Download model** in the panel |
@@ -30,6 +30,11 @@
 
 ## Reading errors in the right place
 
+- **Debug button:** automatically collects Narrately's uncaught errors and
+  console warnings/errors from its content, popup, background, inference host,
+  and worker contexts. Open Debug and select **Copy captured logs** to copy the
+  report. It cannot read other extensions' logs or unrelated browser/page
+  console messages.
 - **Content script and panel:** the page's DevTools console.
 - **Host page and inference worker:** Chrome, `chrome://extensions` then
   *Inspect views* or the Errors button; Firefox, `about:debugging` then **Inspect**.

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Narrately Debug</title>
+  <link rel="stylesheet" href="./popup.css">
+</head>
+<body class="debug-page">
+  <header>
+    <div>
+      <strong>Narrately</strong>
+      <small>Debug helper</small>
+    </div>
+  </header>
+  <main>
+    <section id="debug-view" aria-labelledby="debug-title">
+      <h1 id="debug-title">Captured Narrately logs</h1>
+      <p class="debug-help">Narrately automatically saves its own warnings and errors here, including inference-host messages. It cannot read other extensions or unrelated browser/page logs.</p>
+      <label for="debug-errors">Captured Narrately logs</label>
+      <textarea id="debug-errors" rows="9" placeholder="No Narrately logs have been captured." readonly></textarea>
+      <p class="privacy-note">Check the report before sharing. Error details can include page URLs.</p>
+      <button id="copy-errors" class="primary" type="button">Copy captured logs</button>
+      <p id="debug-status" role="status" aria-live="polite"></p>
+      <a
+        class="support-button"
+        href="https://github.com/abdullahkhfb/narrately/issues/new?template=bug_report.yml"
+        target="_blank"
+        rel="noopener noreferrer"
+      >Report a bug</a>
+    </section>
+  </main>
+  <script type="module" src="./debug.ts"></script>
+</body>
+</html>

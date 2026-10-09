@@ -10,6 +10,7 @@ browser restriction made the obvious approach fail. Read the relevant note befor
 | --- | --- |
 | Content and background scripts are built as **self-contained IIFE** bundles (`scripts/build-ts.mjs`) | Manifest content scripts are classic scripts. ES-module output with shared chunks throws `SyntaxError` the moment the browser injects `content.js` |
 | A hidden **extension-origin iframe** (`host.html` + `host.ts`) owns the inference worker, the Rust core and the audio cache | Content scripts run with the page's origin and cannot construct `new Worker(chrome-extension://…)` (`SecurityError`); an IndexedDB cache in the page origin would also not be shared across sites. Audio `ArrayBuffer`s are transferred back zero-copy |
+| Debug reports are stored locally and capped at 100 records | Browser extensions cannot read arbitrary DevTools output; Narrately captures its own uncaught errors and console warnings/errors in each extension context |
 | Inference runs in a separate worker, not the background | Model loading and long generation are not tied to the MV3 background event lifetime |
 | **Neutral manifest, per-browser derivation** (`scripts/manifest.mjs`) | Chrome rejects `background.scripts` in MV3; Firefox does not run `background.service_worker` |
 | Beta number becomes the 4th version component, name goes in `version_name` | Browsers accept only numeric versions |
@@ -33,8 +34,9 @@ browser restriction made the obvious approach fail. Read the relevant note befor
 ## Security posture
 
 - No telemetry, no analytics, no remote text processing.
-- Permissions: `storage`, `unlimitedStorage`, and Hugging Face host permissions
-  used only by the model download. No `downloads`, `activeTab` or `<all_urls>`.
+- Permissions: `storage`, `unlimitedStorage`, `clipboardWrite` (for copying
+  debug reports), and Hugging Face host permissions used only by the model
+  download. No `downloads`, `activeTab` or `<all_urls>`.
 - Extension-page CSP: `script-src 'self' 'wasm-unsafe-eval'; object-src 'self'`.
 - The inference worker blocks every `http(s)` request that is not a cached model
   file. An unexpected dependency request therefore fails loudly instead of leaking.
@@ -47,9 +49,12 @@ browser restriction made the obvious approach fail. Read the relevant note befor
 
 ## Known limits
 
-- **Site support:** only Lnori is fully adapted and officially supported. Other
-  sites go through the generic fallback, which is best-effort: it yields a single
-  chapter, can choose the wrong element, and is not tested against real sites.
+- **Site support:** Lnori, Cyrisia and Novel Archive have dedicated adapters.
+  Cyrisia renders its book in frames; the adapter reads same-origin frame
+  content where available. It reads a snapshot of sections present when the
+  panel mounts. Other sites go through the generic fallback, which is
+  best-effort: it yields a single chapter, can choose the wrong element, and is
+  not tested against real sites.
   To officially support another site, add a dedicated adapter under
   `src/content/sites/`; see [Adding a supported site](adding-a-site.md).
 
@@ -63,8 +68,9 @@ browser restriction made the obvious approach fail. Read the relevant note befor
 - Beta builds are not store-listed; Firefox builds are unsigned and load only as temporary add-ons.
 - `validate_voice_embedding` and the `local_embedding` voice kind are
   scaffolding for future work and are not wired into the UI.
-- The background message handlers (`get_settings`, `set_settings`,
-  `get_voice_catalog`) are available but not used by the panel or popup yet.
+- Debug stores up to 100 captured Narrately warnings/errors in
+  `browser.storage.local`. The browser does not expose unrelated DevTools
+  console output to extensions.
 
 ## Future extension points
 

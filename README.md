@@ -6,7 +6,8 @@ Narrately is a browser add-on for Chrome and Firefox. Open a chapter on
 **Lnori**, click the small Narrately bubble, and it reads the text to you in a
 natural-sounding voice.
 
-> **Beta:** Narrately is in early testing, so expect rough edges. Bug reports are welcome.
+> [!WARNING]
+> **Beta software.** Expect bugs; feedback is welcome.
 
 ## Why Narrately?
 
@@ -21,6 +22,8 @@ natural-sounding voice.
 | Site | Status |
 | --- | --- |
 | <a href="https://lnori.com"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/sites/lnori-white.svg"><img src="docs/assets/sites/lnori.svg" alt="Lnori logo" width="20"></picture></a> &nbsp;**[Lnori](https://lnori.com)** | Officially supported. Chapter list, chapter titles and next/previous chapter all work. |
+| <a href="https://cyrisia.com/"><img src="docs/assets/sites/cyrisia.png" alt="Cyrisia logo" width="20"></a> &nbsp;**[Cyrisia](https://cyrisia.com/)** | Supported (new). Reads the EPUB sections of the book you have open. Reports welcome while it is verified against the live site. |
+| <a href="https://novelarchive.cc/"><img src="docs/assets/sites/novelarchive.png" alt="Novel Archive logo" width="20"></a> &nbsp;**[Novel Archive](https://novelarchive.cc/)** | Officially supported. Reads the current chapter and novel title from the reader page. |
 
 **Other sites may work, but are not guaranteed.** On other pages Narrately makes
 its best guess at the main text. It often works on simple article-style pages,
@@ -113,8 +116,9 @@ Open them from the toolbar icon.
 
 - Narrately has no analytics and no tracking.
 - It never sends the text you read to any server.
-- It asks for very little permission. It only stores your settings and the voice
-  files on your computer.
+- It asks for very little permission. It stores your settings, voice files, and
+  up to 100 captured Narrately diagnostic logs on your computer. Logs may
+  include page URLs; review them before sharing.
 - The voice download comes from Hugging Face. The main voice file is checked to
   make sure it is the right one before it is used.
 

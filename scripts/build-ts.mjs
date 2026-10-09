@@ -58,6 +58,7 @@ async function buildModuleContexts() {
         input: {
           inference_worker: resolve(ROOT, 'src/inference/worker.ts'),
           popup: resolve(ROOT, 'src/popup/index.html'),
+          debug: resolve(ROOT, 'src/popup/debug.html'),
           host: resolve(ROOT, 'src/inference/host.html'),
         },
         output: {

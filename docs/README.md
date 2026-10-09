@@ -23,9 +23,10 @@ Contribution rules live in [CONTRIBUTING.md](../CONTRIBUTING.md) at the reposito
 
 ## Site support
 
-**[Lnori](https://lnori.com) is the only officially supported site.** It has a
-dedicated adapter (`src/content/sites/lnori.ts`) and the panel is fully adapted
-to it: chapter list, titles and chapter navigation. A generic fallback tries to
+**[Lnori](https://lnori.com), [Cyrisia](https://cyrisia.com/) and [Novel Archive](https://novelarchive.cc/) are officially supported.**
+Each has a dedicated adapter under `src/content/sites/`. The Lnori adapter
+supports volume chapter lists; Cyrisia and Novel Archive detect the current
+chapter from their reader pages. A generic fallback tries to
 find the main text on any other `http(s)` page, so other sites **may** work, but
 they are best-effort and untested.
 

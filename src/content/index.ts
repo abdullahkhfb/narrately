@@ -3,9 +3,19 @@
  */
 
 import {browser} from '../shared/browser';
+import {installDebugErrorCapture} from '../shared/debugErrors';
+import type {DebugErrorRecord} from '../shared/messages';
 import {mountPanel, openPanel} from './panel';
 
 const GIVE_UP_AFTER_MS = 60_000;
+
+installDebugErrorCapture('content', reportContentError);
+
+function reportContentError(error: DebugErrorRecord): Promise<void> {
+  return browser.runtime
+    .sendMessage({type: 'report_debug_error', error})
+    .then(() => undefined);
+}
 
 function start(): void {
   if (mountPanel()) {
@@ -13,16 +23,30 @@ function start(): void {
   }
   // Reader sites often render chapters after load, so keep watching briefly.
   let timer: number | undefined;
-  const observer = new MutationObserver(() => {
+  const retry = (): void => {
     window.clearTimeout(timer);
     timer = window.setTimeout(() => {
       if (mountPanel()) {
-        observer.disconnect();
+        stop();
       }
     }, 800);
-  });
+  };
+  // Frame content (EPUB readers) is invisible to the observer, but the frame's
+  // load event does not bubble, so listen for it in the capture phase.
+  const onLoad = (event: Event): void => {
+    if (event.target instanceof HTMLIFrameElement) {
+      retry();
+    }
+  };
+  const observer = new MutationObserver(retry);
+  const stop = (): void => {
+    window.clearTimeout(timer);
+    observer.disconnect();
+    document.removeEventListener('load', onLoad, true);
+  };
   observer.observe(document.body, {childList: true, subtree: true});
-  window.setTimeout(() => observer.disconnect(), GIVE_UP_AFTER_MS);
+  document.addEventListener('load', onLoad, true);
+  window.setTimeout(stop, GIVE_UP_AFTER_MS);
 }
 
 if (document.readyState === 'loading') {

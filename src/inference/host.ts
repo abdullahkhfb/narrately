@@ -7,14 +7,23 @@
  */
 
 import {extensionUrl} from '../shared/extensionUrl';
+import {installDebugErrorCapture} from '../shared/debugErrors';
 import {narrateChapter, type AudioChunk, type WorkerClient} from '../core/narration';
 import {downloadModel, isModelInstalled} from './modelStore';
 import type {
+  DebugErrorRecord,
   HostRequest,
   InferenceMessage,
   NarrateMessage,
   WorkerMessage,
 } from '../shared/messages';
+
+installDebugErrorCapture('inference host', reportHostError);
+
+function reportHostError(error: DebugErrorRecord): Promise<void> {
+  window.parent.postMessage({type: 'narrately_debug_error', error}, '*');
+  return Promise.resolve();
+}
 
 interface Pending {
   resolve: (chunk: AudioChunk) => void;
@@ -29,7 +38,12 @@ const controllers = new Map<string, AbortController>();
 
 worker.addEventListener('message', (event: MessageEvent<WorkerMessage>) => {
   const message = event.data;
-  if (message.type === 'result') {
+  if (message.type === 'debug_error') {
+    window.parent.postMessage(
+      {type: 'narrately_debug_error', error: message.error},
+      '*',
+    );
+  } else if (message.type === 'result') {
     pending.get(message.jobId)?.resolve({
       audio: message.audio,
       durationMs: message.durationMs,

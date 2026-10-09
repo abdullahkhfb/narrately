@@ -49,7 +49,7 @@ See [Getting started](getting-started.md#load-the-extension).
 
 ### Prepare a test page
 
-Test against **Lnori** first; it is the only officially supported site. Any
+Test against **Lnori** first. Cyrisia is also officially supported (step 14 below). Any
 change under `src/content/sites/` must keep the Lnori path working. Other sites are
 optional, best-effort checks. When you add a site, add its own row to the checklist below (see [Adding a supported site](adding-a-site.md#checklist-for-a-new-official-site)). Options:
 
@@ -70,7 +70,7 @@ optional, best-effort checks. When you add a site, add its own row to the checkl
 
 | # | Step | Expected result |
 | --- | --- | --- |
-| 1 | Open a Lnori chapter page | A round bubble appears; the chapter list shows the book's chapters |
+| 1 | Open a Lnori volume with multi-part chapters, such as *The Apothecary Diaries*, Volume 1 | A round bubble appears; the chapter list shows chapter names, image-only selectors do not create entries, and untitled text selectors continue the preceding chapter |
 | 2 | Click the bubble | The panel opens: chapter and voice selects, speed slider, text preview toggle, Generate button, status line |
 | 3 | First run, no model | A "Voice model needed" card offers **Download model**; Generate is disabled |
 | 4 | Click **Download model** | Progress with a cancel option; ends with "Voice model ready."; works again after reloading the page |
@@ -83,6 +83,9 @@ optional, best-effort checks. When you add a site, add its own row to the checkl
 | 11 | DevTools, Network (page and extension contexts) | Only the model download hits `huggingface.co`. No other remote requests |
 | 12 | Console | No `SyntaxError` from `content.js`, no `SecurityError` from `new Worker`, no `Blocked remote inference request` |
 | 13 | Disable the extension | Panel disappears; the page keeps working |
+| 14 | Open a book in the Cyrisia reader | The bubble appears once the book has rendered; the chapter list holds the rendered sections with narration text free of menus. The home page and library pages show no bubble |
+| 15 | Panel, drag or wheel the **Speed** slider | The value changes without scrolling the panel or the page, and arrow keys do not turn the reader's page. With a chapter prepared, playback speed follows the slider |
+| 16 | Open a Novel Archive chapter page | The bubble appears with the novel and chapter titles; narration contains the chapter text without translator/editor credits |
 
 Tip for step 11: in Chrome the worker's requests appear under the
 `chrome-extension://<id>` context in DevTools; in Firefox use **Inspect** on the

@@ -6,7 +6,7 @@ the deterministic domain core is Rust compiled to WebAssembly.
 
 ## Runtime contexts
 
-Five extension contexts cooperate. Each exists because of a browser restriction
+Six extension contexts cooperate. Each exists because of a browser restriction
 (see [Design notes](design-notes.md)).
 
 ```mermaid
@@ -22,7 +22,8 @@ flowchart TB
         worker["inference_worker.js<br/>module worker<br/>kokoro-js + transformers.js, fetch guard"]
         bg["background.js<br/>service worker (Chrome)<br/>event page (Firefox)"]
         popup["popup page<br/>settings UI"]
-        storage[("storage.local<br/>settings")]
+        debug["debug page<br/>captured Narrately logs"]
+        storage[("storage.local<br/>settings + debug logs")]
     end
 
     page -->|"reads text"| content
@@ -34,6 +35,10 @@ flowchart TB
     bg --- storage
     popup --- storage
     content --- storage
+    debug -->|"get_debug_errors<br/>runtime.sendMessage"| bg
+    content -->|"report_debug_error"| bg
+    host -->|"postMessage<br/>narrately_debug_error"| content
+    worker -->|"debug_error"| host
 ```
 
 | Context | Entry | Bundle format | Responsibilities |
@@ -41,8 +46,9 @@ flowchart TB
 | Content script | `src/content/index.ts` | IIFE (classic) | Detect chapters, render the Shadow DOM panel, drive playback, embed the host iframe |
 | Host page | `src/inference/host.ts` | ES module | Own the worker, the Rust/WASM core, the audio cache and the model store |
 | Inference worker | `src/inference/worker.ts` | ES module worker | Load Kokoro, synthesize one chunk at a time, enforce the local-only fetch guard |
-| Background | `src/background/index.ts` | IIFE (classic) | Seed default settings on install; answers `get_settings`, `set_settings`, `get_voice_catalog`, `open_panel` |
+| Background | `src/background/index.ts` | IIFE (classic) | Seed default settings on install; handle settings, panel, and debug-log messages; retain up to 100 local diagnostic records |
 | Popup | `src/popup/index.ts` | ES module | Edit settings (reads and writes `storage.local` directly), ask the active tab to open its panel |
+| Debug page | `src/popup/debug.ts` | ES module | Display captured Narrately warnings/errors and copy the report; cannot read unrelated browser or page console output |
 
 The manifest declares both Chrome's and Firefox's background style in neutral
 form; [`scripts/manifest.mjs`](../scripts/manifest.mjs) emits only the key each
@@ -155,12 +161,12 @@ flowchart LR
 
 | Channel | Direction | Types |
 | --- | --- | --- |
-| `runtime.sendMessage` | any extension page to background | `get_settings`, `set_settings`, `get_voice_catalog`, `open_panel` (handled by the background today, but the panel and popup currently read `storage.local` and the catalog directly) |
+| `runtime.sendMessage` | popup/content/debug page to background | settings and panel messages; `report_debug_error`, `get_debug_errors` |
 | `tabs.sendMessage` | popup to content | `open_panel` |
 | `postMessage` | content to host iframe | `narrate`, `cancel`, `model_status`, `model_download`, `warmup` |
-| `postMessage` | host iframe to content | `progress`, `result`, `error`, `model_status` |
+| `postMessage` | host iframe to content | `progress`, `result`, `error`, `model_status`, `narrately_debug_error` |
 | `Worker.postMessage` | host to worker | `synthesize`, `cancel`, `warmup` |
-| `Worker.postMessage` | worker to host | `progress`, `result`, `error`, `ready` |
+| `Worker.postMessage` | worker to host | `progress`, `result`, `error`, `ready`, `debug_error` |
 
 Every request carries a `jobId`. The content-side `HostClient` keeps a
 `Map<jobId, listener>`; progress messages keep the listener, while `result`,
@@ -208,7 +214,7 @@ classDiagram
 ```
 
 - `InferenceDevice` is `'wasm' | 'webgpu'`; `VoiceKind` is `'preset' | 'local_embedding'`.
-- `Book.source` is a `SiteId`: the id of the adapter that produced the book (`'lnori'`, or `'generic'` for the best-effort fallback). Add a member per new site.
+- `Book.source` is a `SiteId`: the id of the adapter that produced the book (`'lnori'`, `'cyrisia'`, `'novelarchive'`, or `'generic'` for the best-effort fallback). Add a member per new site.
 - Defaults: voice `af_heart`, speed `1`, device `wasm`, cache on.
 
 ## Chapter detection
@@ -221,7 +227,9 @@ adding a site is in [Adding a supported site](adding-a-site.md).
 ```mermaid
 flowchart TD
     start["detectBook()"] --> order["adapters for this host first,<br/>then the other registered adapters"]
-    order --> lnori["Lnori adapter (official)<br/>section.chapter elements<br/>one chapter per section<br/>title from h2.chapter-title or h2"]
+    order --> lnori["Lnori adapter (official)<br/>section.chapter elements<br/>chapter headings label entries<br/>untitled text selectors continue the prior chapter; image-only selectors are skipped"]
+    order --> cyrisia["Cyrisia adapter (official)<br/>host cyrisia.com only<br/>main.ch-page/#ch-text, then readable iframes<br/>sequential same-name Part One/Two iframe sections are joined"]
+    order --> novelarchive["Novel Archive adapter (official)<br/>#reader-article and reader title selectors<br/>one current chapter per reader URL"]
     order --> future["future site adapters"]
     lnori --> hit{"Book found?"}
     future --> hit
@@ -236,7 +244,9 @@ flowchart TD
 
 | Adapter | `Book.source` | Support level |
 | --- | --- | --- |
-| `lnori.ts` (`section.chapter` markup, host `lnori.com`) | `'lnori'` | **Official.** Multi-chapter books, real chapter titles, chapter navigation |
+| `lnori.ts` (`section.chapter` markup, host `lnori.com`) | `'lnori'` | **Official.** Multi-chapter books, real chapter titles, chapter navigation; untitled text selectors continue the prior chapter and image-only selectors are skipped |
+| `cyrisia.ts` (`main.ch-page` and `#ch-text`, host `cyrisia.com`) | `'cyrisia'` | **Official.** Reads the chapter title and story from the live reader, with iframe fallback; sequential selectors for named chapter parts are joined |
+| `novelarchive.ts` (`#reader-article`, host `novelarchive.cc`) | `'novelarchive'` | **Official.** One chapter per reader URL, with novel and chapter titles |
 | `generic.ts` (scored article or main element) | `'generic'` | **Best effort.** One synthetic chapter named after the first heading; no chapter list; may pick the wrong block on unfamiliar layouts |
 
 Only registered adapters are maintained against a real site. Behaviour on other
@@ -254,9 +264,14 @@ If nothing is found at load, `content/index.ts` watches DOM mutations (debounced
 | What | Where | Owner |
 | --- | --- | --- |
 | Settings | `browser.storage.local` key `settings` | background, popup, panel |
+| Captured Narrately logs | `browser.storage.local` key `debugErrors` (latest 100) | background, debug page |
 | Generated audio | IndexedDB `narrately` / `audio_cache` (extension origin, shared across sites) | host page |
 | Model files | Cache API `narrately-model-v1` (extension origin) | host page, worker |
 | Voice packs | Bundled in the package under `models/.../voices/` | build |
 
-Permissions requested: `storage`, `unlimitedStorage`, and host permissions for
-Hugging Face (used only by the model download).
+Permissions requested: `storage`, `unlimitedStorage`, `clipboardWrite` (copy
+captured debug logs), and host permissions for Hugging Face (used only for the
+model download).
+
+Debug stores up to 100 captured Narrately warnings and errors locally. The
+browser does not expose unrelated DevTools console output to extensions.

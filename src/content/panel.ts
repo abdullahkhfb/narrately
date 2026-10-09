@@ -163,14 +163,42 @@ async function wirePanel(root: ParentNode, book: Book): Promise<void> {
   let cancelled = false;
   let latest: ArrayBuffer | undefined;
   let latestUrl: string | undefined;
+  let generatedSpeed = 1;
   let startedAt = 0;
   let firstDoneAt = 0;
 
-  const settings = await getSettings();
+  let settings: Awaited<ReturnType<typeof getSettings>>;
+  let settingsUnavailable = false;
+  try {
+    settings = await getSettings();
+  } catch (error: unknown) {
+    status.textContent = getErrorMessage(error);
+    settings = {
+      voiceId: 'af_heart',
+      speed: 1,
+      device: 'wasm',
+      cacheEnabled: true,
+    };
+    settingsUnavailable = true;
+  }
   voice.value = settings.voiceId;
   speed.value = String(settings.speed);
+  if (settingsUnavailable) {
+    voice.disabled = true;
+    speed.disabled = true;
+    modelButton.disabled = true;
+  }
+  /** Playback ratio between the chosen speed and the speed the audio was made at. */
+  const applyPlaybackRate = (): void => {
+    const rate = Number(speed.value) / generatedSpeed;
+    // Both properties: assigning `src` resets `playbackRate` to the default.
+    audio.defaultPlaybackRate = rate;
+    audio.playbackRate = rate;
+    audio.preservesPitch = true;
+  };
   const showSpeed = (): void => {
     speedOut.textContent = `${Number(speed.value).toFixed(2)}×`;
+    applyPlaybackRate();
   };
   showSpeed();
 
@@ -194,6 +222,10 @@ async function wirePanel(root: ParentNode, book: Book): Promise<void> {
     // Keep page shortcuts (e.g. reader hotkeys) from firing while typing.
     event.stopPropagation();
   });
+  // Readers often page on keyup/keypress too, so the arrow keys that move a
+  // slider must not turn the page behind it.
+  panel.addEventListener('keyup', (event) => event.stopPropagation());
+  panel.addEventListener('keypress', (event) => event.stopPropagation());
 
   const resetPlayer = (): void => {
     audio.pause();
@@ -234,13 +266,35 @@ async function wirePanel(root: ParentNode, book: Book): Promise<void> {
   });
 
   const persist = (): void => {
-    void getSettings().then((current) =>
-      setSettings({...current, voiceId: voice.value, speed: Number(speed.value)}),
-    );
+    void getSettings()
+      .then((current) =>
+        setSettings({...current, voiceId: voice.value, speed: Number(speed.value)}),
+      )
+      .catch((error: unknown) => {
+        status.textContent = getErrorMessage(error);
+      });
   };
   voice.addEventListener('change', persist);
   speed.addEventListener('input', showSpeed);
   speed.addEventListener('change', persist);
+  // Scrolling the wheel over the slider adjusts it instead of scrolling the
+  // panel or the page behind it.
+  speed.addEventListener(
+    'wheel',
+    (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const step = Number(speed.step) || 0.05;
+      const direction = event.deltaY < 0 ? 1 : -1;
+      const min = Number(speed.min);
+      const max = Number(speed.max);
+      const next = Math.min(max, Math.max(min, Number(speed.value) + direction * step));
+      speed.value = (Math.round(next / step) * step).toFixed(2);
+      showSpeed();
+      persist();
+    },
+    {passive: false},
+  );
 
   // Voice model: gate Generate until the files are on this device.
   let download: Job<void> | undefined;
@@ -255,20 +309,21 @@ async function wirePanel(root: ParentNode, book: Book): Promise<void> {
   /** Re-checks the model for the current device (the popup may have changed
    * it) and pre-loads it so the first narration starts sooner. */
   async function refreshModel(): Promise<void> {
-    const {device} = await getSettings();
-    modelBlurb.textContent =
-      device === 'webgpu'
-        ? 'WebGPU fast mode needs a one-time download of about 312 MB from Hugging Face. It is stored on this device.'
-        : 'One-time download of about 88 MB from Hugging Face. It is stored on this device, and narration then works offline.';
     try {
+      const {device} = await getSettings();
+      modelBlurb.textContent =
+        device === 'webgpu'
+          ? 'WebGPU fast mode needs a one-time download of about 312 MB from Hugging Face. It is stored on this device.'
+          : 'One-time download of about 88 MB from Hugging Face. It is stored on this device, and narration then works offline.';
       const installed = await host.modelInstalled(device);
       setModelReady(installed);
       if (installed && warmedDevice !== device) {
         warmedDevice = device;
         host.warmup(device);
       }
-    } catch {
-      setModelReady(true);
+    } catch (error: unknown) {
+      status.textContent = getErrorMessage(error);
+      setModelReady(!isExtensionContextInvalidated(error));
     }
   }
 
@@ -330,6 +385,7 @@ async function wirePanel(root: ParentNode, book: Book): Promise<void> {
       const current = await getSettings();
       startedAt = performance.now();
       firstDoneAt = 0;
+      generatedSpeed = Number(speed.value);
       job = host.narrate(
         {
           text: text.value,
@@ -361,6 +417,7 @@ async function wirePanel(root: ParentNode, book: Book): Promise<void> {
       latest = result.audio;
       latestUrl = URL.createObjectURL(new Blob([result.audio], {type: 'audio/wav'}));
       audio.src = latestUrl;
+      applyPlaybackRate();
       player.hidden = false;
       const seconds = (performance.now() - startedAt) / 1000;
       status.textContent = `Chapter ready (prepared in ${formatDuration(seconds)}) — nothing left your device.`;
@@ -483,10 +540,17 @@ function escapeHtml(value: string): string {
 
 function getErrorMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : 'Narration failed.';
+  if (isExtensionContextInvalidated(error)) {
+    return 'Narrately was reloaded or updated. Refresh this page to reconnect.';
+  }
   if (/not found locally|Could not locate file/i.test(message)) {
     return 'The voice model is missing. Reopen the panel and use "Download model".';
   }
   return message;
+}
+
+function isExtensionContextInvalidated(error: unknown): boolean {
+  return error instanceof Error && /extension context invalidated/i.test(error.message);
 }
 
 /** A "Beta" pill when the installed build is a pre-release. */
@@ -507,4 +571,3 @@ function formatDuration(seconds: number): string {
 function formatMb(bytes: number): string {
   return `${(bytes / 1_048_576).toFixed(1)} MB`;
 }
-

@@ -3,9 +3,17 @@
  */
 
 import {loadKokoro, synthesizeLocal} from './kokoro';
-import type {InferenceMessage, WorkerMessage} from '../shared/messages';
+import {installDebugErrorCapture} from '../shared/debugErrors';
+import type {DebugErrorRecord, InferenceMessage, WorkerMessage} from '../shared/messages';
 
 let busy = Promise.resolve();
+
+installDebugErrorCapture('inference worker', reportWorkerError);
+
+function reportWorkerError(error: DebugErrorRecord): Promise<void> {
+  post({type: 'debug_error', error});
+  return Promise.resolve();
+}
 
 self.addEventListener('message', (event: MessageEvent<InferenceMessage>) => {
   const message = event.data;
