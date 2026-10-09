@@ -21,9 +21,9 @@ natural-sounding voice.
 
 | Site | Status |
 | --- | --- |
-| <a href="https://lnori.com"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/sites/lnori-white.svg"><img src="docs/assets/sites/lnori.svg" alt="Lnori logo" width="20"></picture></a> &nbsp;**[Lnori](https://lnori.com)** | Officially supported. Chapter list, chapter titles and next/previous chapter all work. |
-| <a href="https://cyrisia.com/"><img src="docs/assets/sites/cyrisia.png" alt="Cyrisia logo" width="20"></a> &nbsp;**[Cyrisia](https://cyrisia.com/)** | Supported (new). Reads the EPUB sections of the book you have open. Reports welcome while it is verified against the live site. |
-| <a href="https://novelarchive.cc/"><img src="docs/assets/sites/novelarchive.png" alt="Novel Archive logo" width="20"></a> &nbsp;**[Novel Archive](https://novelarchive.cc/)** | Officially supported. Reads the current chapter and novel title from the reader page. |
+| <a href="https://lnori.com"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/sites/lnori-white.svg"><img src="docs/assets/sites/lnori.svg" alt="Lnori logo" width="20"></picture></a> &nbsp;**[Lnori](https://lnori.com)** | Officially supported. |
+| <a href="https://cyrisia.com/"><img src="docs/assets/sites/cyrisia.png" alt="Cyrisia logo" width="20"></a> &nbsp;**[Cyrisia](https://cyrisia.com/)** | Officially supported. |
+| <a href="https://novelarchive.cc/"><img src="docs/assets/sites/novelarchive.png" alt="Novel Archive logo" width="20"></a> &nbsp;**[Novel Archive](https://novelarchive.cc/)** | Officially supported. |
 
 **Other sites may work, but are not guaranteed.** On other pages Narrately makes
 its best guess at the main text. It often works on simple article-style pages,
