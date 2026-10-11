@@ -1,1 +1,5 @@
-blank_issues_enabled: true
+blank_issues_enabled: false
+contact_links:
+  - name: Troubleshooting guide
+    url: https://github.com/abdullahkhfb/narrately/blob/main/docs/troubleshooting.md
+    about: Fixes for the most common problems, and how to read Narrately's Debug logs.

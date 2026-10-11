@@ -7,6 +7,7 @@ import {installDebugErrorCapture} from '../shared/debugErrors';
 import type {DebugErrorRecord} from '../shared/messages';
 import {getRequiredElement} from './dom';
 import {initializeSettingsView} from './settings-view';
+import {initializeStorageView} from './storage-view';
 import logoIcon from '../icons/ui/logo.svg?raw';
 
 installDebugErrorCapture('popup', reportPopupError);
@@ -29,8 +30,8 @@ getRequiredElement('debug-open', HTMLButtonElement).addEventListener('click', as
     await browser.windows.create({
       url: browser.runtime.getURL('src/popup/debug.html'),
       type: 'popup',
-      width: 640,
-      height: 640,
+      width: 560,
+      height: 480,
     });
   } catch {
     getRequiredElement('status', HTMLElement).textContent =
@@ -38,4 +39,15 @@ getRequiredElement('debug-open', HTMLButtonElement).addEventListener('click', as
   }
 });
 
+const settingsView = getRequiredElement('settings-view', HTMLElement);
+const storageView = getRequiredElement('storage-view', HTMLElement);
+const showStorage = (open: boolean): void => {
+  settingsView.hidden = open;
+  storageView.hidden = !open;
+  getRequiredElement(open ? 'storage-back' : 'storage-open', HTMLButtonElement).focus();
+};
+getRequiredElement('storage-open', HTMLButtonElement).addEventListener('click', () => showStorage(true));
+getRequiredElement('storage-back', HTMLButtonElement).addEventListener('click', () => showStorage(false));
+
 await initializeSettingsView();
+await initializeStorageView();

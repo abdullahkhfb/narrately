@@ -2,11 +2,13 @@
  * @fileoverview Serializes Kokoro jobs in a dedicated worker.
  */
 
-import {loadKokoro, synthesizeLocal} from './kokoro';
+import {synthesizeLocal, warmupKokoro} from './kokoro';
 import {installDebugErrorCapture} from '../shared/debugErrors';
 import type {DebugErrorRecord, InferenceMessage, WorkerMessage} from '../shared/messages';
 
 let busy = Promise.resolve();
+// Jobs cancelled while still queued; checked when their turn comes.
+const cancelled = new Set<string>();
 
 installDebugErrorCapture('inference worker', reportWorkerError);
 
@@ -17,7 +19,15 @@ function reportWorkerError(error: DebugErrorRecord): Promise<void> {
 
 self.addEventListener('message', (event: MessageEvent<InferenceMessage>) => {
   const message = event.data;
+  if (message.type === 'cancel') {
+    // Handled immediately, not through the queue, or it would run only
+    // after the jobs it is meant to cancel.
+    cancelled.add(message.jobId);
+    return;
+  }
   busy = busy.then(() => handleMessage(message)).catch((error: unknown) => {
+    // Logged so the Debug window explains failures the panel only summarizes.
+    console.error(`Inference worker could not handle "${message.type}":`, error);
     // Without the job id the host could never settle the pending request.
     const jobId = message.type === 'synthesize' ? message.jobId : undefined;
     post({
@@ -31,10 +41,13 @@ self.addEventListener('message', (event: MessageEvent<InferenceMessage>) => {
 async function handleMessage(message: InferenceMessage): Promise<void> {
   switch (message.type) {
     case 'warmup':
-      await loadKokoro(message.device, () => {});
+      await warmupKokoro(message.device);
       post({type: 'ready', voices: []});
       return;
     case 'synthesize': {
+      if (cancelled.delete(message.jobId)) {
+        throw new Error('Narration cancelled.');
+      }
       post({
         type: 'progress',
         jobId: message.jobId,

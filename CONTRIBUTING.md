@@ -17,6 +17,12 @@ interfaces for object-shaped APIs, and add short JSDoc to public symbols.
 Add a site adapter under `src/content/sites/`; see
 [docs/adding-a-site.md](docs/adding-a-site.md).
 
+## Issues and pull requests
+
+Open issues from the templates: **Bug report**, **Question**, or **Blank issue**
+for anything else. Pull requests start from a checklist in
+`.github/PULL_REQUEST_TEMPLATE.md`; UI changes need screenshots.
+
 ## Checks
 
 Before opening a PR (details in [docs/testing.md](docs/testing.md)):

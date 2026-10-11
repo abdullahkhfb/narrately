@@ -19,7 +19,7 @@ natural-sounding voice.
 
 ## Supported websites
 
-| Site | Status |
+| Site | Works with |
 | --- | --- |
 | <a href="https://lnori.com"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/sites/lnori-white.svg"><img src="docs/assets/sites/lnori.svg" alt="Lnori logo" width="20"></picture></a> &nbsp;**[Lnori](https://lnori.com)** | Officially supported. |
 | <a href="https://cyrisia.com/"><img src="docs/assets/sites/cyrisia.png" alt="Cyrisia logo" width="20"></a> &nbsp;**[Cyrisia](https://cyrisia.com/)** | Officially supported. |
@@ -70,8 +70,12 @@ This is the voice itself.
 1. Open a chapter on Lnori (other sites may work, but are not guaranteed).
 2. Click the round **Narrately bubble** that appears on the page.
 3. Pick a **chapter**, a **voice** and a **speed**.
-4. Click **Generate narration**. Narrately prepares the whole chapter first, then you can press play.
-5. Use the player to pause, skip back or forward 15 seconds, restart, or **download** the audio.
+4. Click **Narrate this chapter**. Narrately prepares the whole chapter first, then you can press play.
+5. Use the player to pause, drag the seek bar, skip back or forward 15 seconds, or **download** the audio.
+
+Everything fits in the panel without scrolling. **Preview text** opens the chapter
+text so you can edit what is read, and the database icon in the header opens
+**Storage**, where you can clear narrated chapters or delete the voice.
 
 You can close the panel while a chapter is being prepared. It keeps working in
 the background and shows a green dot on the bubble when it is ready.
@@ -105,12 +109,14 @@ These are ready-made voices. Narrately cannot copy your own voice or anyone else
 
 Open them from the toolbar icon.
 
-- **Voice** and **Speed** — your defaults.
+- **Voice** and **Speed** — your defaults. Speed is 1×, 1.25× or 1.5×, the same buttons the panel has.
 - **Device** — *WASM* works on nearly every computer. *WebGPU* can be faster on a
   computer that supports it, but needs a separate, larger download (about 312 MB).
   If you are unsure, leave it on WASM.
 - **Cache generated audio** — keeps finished audio on your computer so replaying a
   chapter is instant. Turn it off if you would rather not store it.
+- **Storage** — shows how much space narrated chapters and the voice use. **Manage**
+  lets you clear narrated chapters, delete the voice, or clear everything.
 
 ## Your privacy
 
@@ -121,6 +127,23 @@ Open them from the toolbar icon.
   include page URLs; review them before sharing.
 - The voice download comes from Hugging Face. The main voice file is checked to
   make sure it is the right one before it is used.
+
+## Screenshots
+
+Captured in Chromium from the extension's own panel, popup and Debug page, with sample
+data. Only the browser APIs and the voice model are stubbed; the markup and styles are the real ones.
+
+| Panel with a narrated chapter | Voice download that failed |
+| --- | --- |
+| ![Panel with the player, speed buttons and Narrate button](docs/assets/screenshots/panel-listen.png) | ![Panel asking for the voice download, with a retry after a network error](docs/assets/screenshots/panel-download-error.png) |
+
+| Preview text | Storage |
+| --- | --- |
+| ![Chapter text editor inside the panel](docs/assets/screenshots/panel-text.png) | ![Storage view with one-click Clear and Delete](docs/assets/screenshots/panel-storage.png) |
+
+| Popup | Popup: Manage storage | Debug window |
+| --- | --- | --- |
+| ![Popup with voice, speed, engine and storage summary](docs/assets/screenshots/popup.png) | ![Popup storage view with Clear, Delete and Clear everything](docs/assets/screenshots/popup-storage.png) | ![Debug window listing captured errors](docs/assets/screenshots/debug-window.png) |
 
 ## Something wrong?
 

@@ -16,15 +16,18 @@ function reportDebugError(error: DebugErrorRecord): Promise<void> {
 }
 
 const copyButton = getRequiredElement('copy-errors', HTMLButtonElement);
-const debugErrors = getRequiredElement('debug-errors', HTMLTextAreaElement);
+const clearButton = getRequiredElement('clear-errors', HTMLButtonElement);
+const debugLog = getRequiredElement('debug-log', HTMLElement);
+const debugCount = getRequiredElement('debug-count', HTMLElement);
 const debugStatus = getRequiredElement('debug-status', HTMLElement);
-const defaultButtonText = copyButton.textContent ?? 'Copy captured logs';
+const defaultButtonText = copyButton.textContent ?? 'Copy logs';
 
 let feedbackTimer: number | undefined;
-let fitTimer: number | undefined;
+/** Plain-text copy of what is shown, used by the Copy button. */
+let logText = '';
 
 copyButton.addEventListener('click', async () => {
-  const errors = debugErrors.value.trim();
+  const errors = logText.trim();
   resetCopyFeedback();
 
   if (!errors) {
@@ -43,6 +46,17 @@ copyButton.addEventListener('click', async () => {
   }
 });
 
+clearButton.addEventListener('click', async () => {
+  resetCopyFeedback();
+  try {
+    await browser.runtime.sendMessage({type: 'clear_debug_errors'});
+    await loadCapturedErrors();
+    debugStatus.textContent = 'Logs cleared.';
+  } catch {
+    debugStatus.textContent = 'Could not clear logs. Reload the extension and try again.';
+  }
+});
+
 void loadCapturedErrors();
 browser.storage.onChanged.addListener((changes, areaName) => {
   if (areaName === 'local' && DEBUG_ERRORS_STORAGE_KEY in changes) {
@@ -58,14 +72,52 @@ async function loadCapturedErrors(): Promise<void> {
       throw new Error('The background returned an invalid debug report.');
     }
     const capturedErrors = records.filter(isDebugErrorRecord);
-    debugErrors.value = formatDebugErrors(capturedErrors);
+    logText = formatDebugErrors(capturedErrors);
+    renderLog(capturedErrors);
+    debugCount.textContent = `${capturedErrors.length} log${capturedErrors.length === 1 ? '' : 's'}`;
     debugStatus.textContent = capturedErrors.length
       ? `${capturedErrors.length} Narrately log${capturedErrors.length === 1 ? '' : 's'} captured.`
       : 'No Narrately logs have been captured yet.';
-    debugErrors.rows = Math.min(24, Math.max(9, debugErrors.value.split('\n').length));
-    scheduleWindowFit();
   } catch {
     debugStatus.textContent = 'Could not load captured errors. Reload the extension and try again.';
+  }
+}
+
+function renderLog(records: DebugErrorRecord[]): void {
+  debugLog.replaceChildren();
+  if (records.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'empty';
+    empty.textContent =
+      'Nothing captured yet. Narrately saves its own warnings and errors here. It cannot see other extensions or page logs.';
+    debugLog.append(empty);
+    return;
+  }
+  for (const record of records) {
+    const level = record.level ?? 'error';
+    const entry = document.createElement('div');
+    entry.className = `entry ${level}`;
+    const dot = document.createElement('i');
+    dot.className = 'lvl';
+    const body = document.createElement('div');
+    const meta = document.createElement('span');
+    meta.className = 'meta';
+    const when = new Date(record.timestamp);
+    const time = Number.isNaN(when.getTime()) ? record.timestamp : when.toLocaleTimeString();
+    meta.textContent = `${time} · ${record.source} · ${level}`;
+    const message = document.createElement('div');
+    message.className = 'msg';
+    message.textContent = record.message;
+    body.append(meta, message);
+    const more = [record.location, record.stack].filter((value): value is string => Boolean(value));
+    if (more.length) {
+      const extra = document.createElement('div');
+      extra.className = 'more';
+      extra.textContent = more.join('\n');
+      body.append(extra);
+    }
+    entry.append(dot, body);
+    debugLog.append(entry);
   }
 }
 
@@ -107,53 +159,6 @@ function copyWithDocumentCommand(text: string): boolean {
     return document.execCommand('copy');
   } finally {
     temporaryInput.remove();
-  }
-}
-
-window.addEventListener('resize', scheduleWindowFit);
-window.addEventListener('load', scheduleWindowFit);
-scheduleWindowFit();
-
-function scheduleWindowFit(): void {
-  if (fitTimer !== undefined) {
-    window.clearTimeout(fitTimer);
-  }
-  fitTimer = window.setTimeout(() => {
-    fitTimer = undefined;
-    void fitWindowToContent();
-  }, 100);
-}
-
-async function fitWindowToContent(): Promise<void> {
-  try {
-    const currentWindow = await browser.windows.getCurrent();
-    if (currentWindow.id === undefined) {
-      return;
-    }
-
-    const horizontalChrome = window.outerWidth - window.innerWidth;
-    const verticalChrome = window.outerHeight - window.innerHeight;
-    const maxWidth = Math.max(320, window.screen.availWidth - 32);
-    const maxHeight = Math.max(280, window.screen.availHeight - 48);
-    const maxContentWidth = Math.max(320, Math.min(680, maxWidth - horizontalChrome));
-    document.body.style.minWidth = `${Math.min(380, maxContentWidth)}px`;
-    document.body.style.maxWidth = `${maxContentWidth}px`;
-    const content = document.body.getBoundingClientRect();
-    const width = Math.min(maxWidth, Math.ceil(content.width + horizontalChrome));
-    const height = Math.min(maxHeight, Math.ceil(content.height + verticalChrome));
-
-    if (
-      currentWindow.width !== undefined &&
-      currentWindow.height !== undefined &&
-      Math.abs(currentWindow.width - width) < 4 &&
-      Math.abs(currentWindow.height - height) < 4
-    ) {
-      return;
-    }
-
-    await browser.windows.update(currentWindow.id, {width, height});
-  } catch {
-    debugStatus.textContent = 'Could not resize the debug window automatically.';
   }
 }
 

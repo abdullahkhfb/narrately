@@ -34,7 +34,7 @@ side parses them and checks the shape at runtime before use.
 
 - Text must not be empty or whitespace.
 - A voice is required and must be in the catalog.
-- Speed must be within 0.5 to 2.0 (the panel slider is narrower, 0.6 to 1.6).
+- Speed must be within 0.5 to 2.0 (the popup and panel offer 1×, 1.25× and 1.5×).
 - A voice embedding has exactly 256 finite values.
 
 ### Cache key

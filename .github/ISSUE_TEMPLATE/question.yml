@@ -1,0 +1,39 @@
+name: Question
+description: Ask how something works or how to use Narrately
+title: "[Question]: "
+labels:
+  - question
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check the [README](https://github.com/abdullahkhfb/narrately#readme) and the [troubleshooting guide](https://github.com/abdullahkhfb/narrately/blob/main/docs/troubleshooting.md) first. Please don't include private chapter text, credentials, or other sensitive information.
+  - type: textarea
+    id: question
+    attributes:
+      label: What would you like to know?
+      description: Ask one question. Say what you are trying to do and what you have already tried.
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and version
+      placeholder: Chrome 140, Firefox 143, etc.
+    validations:
+      required: false
+  - type: input
+    id: extension-version
+    attributes:
+      label: Narrately version
+      placeholder: 0.1.0-beta.3
+    validations:
+      required: false
+  - type: input
+    id: site
+    attributes:
+      label: Website you are reading on
+      description: Only if your question is about a specific site.
+      placeholder: lnori.com, cyrisia.com, novelarchive.cc, etc.
+    validations:
+      required: false

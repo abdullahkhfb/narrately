@@ -10,8 +10,10 @@ import type {
   NarrateMessage,
   ProgressMessage,
   ResultMessage,
+  StorageInfoMessage,
   WorkerMessage,
 } from '../shared/messages';
+import type {ClearTarget, StorageInfo} from '../shared/storageManager';
 
 type Device = NarrateMessage['device'];
 export type NarrationRequest = Omit<NarrateMessage, 'type' | 'jobId'>;
@@ -36,10 +38,16 @@ export interface HostClient {
   ): Job<void>;
   /** Starts loading the model so the first narration begins sooner. */
   warmup(device: Device): void;
+  /** Reads how much space cached chapters and the model take. */
+  storageInfo(): Promise<StorageInfo>;
+  /** Deletes cached chapters and/or the model; resolves with the new usage. */
+  clearStorage(target: ClearTarget): Promise<StorageInfo>;
 }
 
+type Reply = ResultMessage | ModelStatusMessage | StorageInfoMessage;
+
 interface Listener {
-  settle: (message: ResultMessage | ModelStatusMessage) => void;
+  settle: (message: Reply) => void;
   reject: (error: Error) => void;
   onProgress: (progress: ProgressMessage) => void;
 }
@@ -90,7 +98,7 @@ export function createHostClient(): HostClient {
     listeners.delete(message.jobId);
     if (message.type === 'error') {
       listener.reject(new Error(message.message));
-    } else if (message.type === 'result' || message.type === 'model_status') {
+    } else if (message.type === 'result' || message.type === 'model_status' || message.type === 'storage_info') {
       listener.settle(message);
     }
   });
@@ -99,9 +107,9 @@ export function createHostClient(): HostClient {
   function call(
     body: Record<string, unknown>,
     onProgress: (progress: ProgressMessage) => void = () => {},
-  ): Job<ResultMessage | ModelStatusMessage> {
+  ): Job<Reply> {
     const jobId = randomJobId();
-    const promise = new Promise<ResultMessage | ModelStatusMessage>(
+    const promise = new Promise<Reply>(
       (settle, reject) => {
         listeners.set(jobId, {settle, reject, onProgress});
         const post = (): void => {
@@ -140,6 +148,12 @@ export function createHostClient(): HostClient {
       const reply = await call({type: 'model_status', device}).promise;
       return reply.type === 'model_status' && reply.installed;
     },
+    async storageInfo() {
+      return toStorageInfo(await call({type: 'storage_info'}).promise);
+    },
+    async clearStorage(target) {
+      return toStorageInfo(await call({type: 'clear_storage', target}).promise);
+    },
     warmup(device) {
       const post = (): void => {
         frame.contentWindow?.postMessage({type: 'warmup', device}, '*');
@@ -154,6 +168,17 @@ export function createHostClient(): HostClient {
       const job = call({type: 'model_download', device}, onProgress);
       return {cancel: job.cancel, promise: job.promise.then(() => undefined)};
     },
+  };
+}
+
+function toStorageInfo(reply: Reply): StorageInfo {
+  if (reply.type !== 'storage_info') {
+    throw new Error('Unexpected host reply.');
+  }
+  return {
+    chapterEntries: reply.chapterEntries,
+    chapterBytes: reply.chapterBytes,
+    modelBytes: reply.modelBytes,
   };
 }
 
@@ -201,6 +226,13 @@ function isWorkerMessage(value: unknown): value is WorkerMessage {
       );
     case 'debug_error':
       return isDebugErrorRecord(record['error']);
+    case 'storage_info':
+      return (
+        typeof record['jobId'] === 'string' &&
+        typeof record['chapterEntries'] === 'number' &&
+        typeof record['chapterBytes'] === 'number' &&
+        typeof record['modelBytes'] === 'number'
+      );
     case 'model_status':
       return (
         typeof record['jobId'] === 'string' &&

@@ -32,9 +32,13 @@
 
 - **Debug button:** automatically collects Narrately's uncaught errors and
   console warnings/errors from its content, popup, background, inference host,
-  and worker contexts. Open Debug and select **Copy captured logs** to copy the
-  report. It cannot read other extensions' logs or unrelated browser/page
-  console messages.
+  and worker contexts. Open Debug and select **Copy logs** to copy the
+  report, or **Clear** to start fresh. Failures such as a blocked model
+  download or a worker that cannot load the model are logged with a stack
+  trace, and a line repeated within two seconds is saved once. It cannot read
+  other extensions' logs or unrelated browser/page console messages.
+
+  ![Debug window listing captured errors](assets/screenshots/debug-window.png)
 - **Content script and panel:** the page's DevTools console.
 - **Host page and inference worker:** Chrome, `chrome://extensions` then
   *Inspect views* or the Errors button; Firefox, `about:debugging` then **Inspect**.

@@ -10,6 +10,7 @@ import {extensionUrl} from '../shared/extensionUrl';
 import {installDebugErrorCapture} from '../shared/debugErrors';
 import {narrateChapter, type AudioChunk, type WorkerClient} from '../core/narration';
 import {downloadModel, isModelInstalled} from './modelStore';
+import {clearStorage, getStorageInfo, type ClearTarget} from '../shared/storageManager';
 import type {
   DebugErrorRecord,
   HostRequest,
@@ -63,10 +64,20 @@ worker.addEventListener('error', () => {
 });
 
 const workerClient: WorkerClient = {
-  synthesize(text, voiceId, speed) {
+  synthesize(text, voiceId, speed, signal) {
     const jobId = crypto.randomUUID();
     return new Promise((resolve, reject) => {
       pending.set(jobId, {resolve, reject});
+      // Lets the worker skip this job if it is still queued when cancelled.
+      signal?.addEventListener(
+        'abort',
+        () => {
+          if (pending.has(jobId)) {
+            worker.postMessage({type: 'cancel', jobId} satisfies InferenceMessage);
+          }
+        },
+        {once: true},
+      );
       worker.postMessage({
         type: 'synthesize',
         jobId,
@@ -101,12 +112,37 @@ window.addEventListener('message', (event: MessageEvent<unknown>) => {
     });
     return;
   }
+  if (event.data.type === 'storage_info') {
+    void replyWithStorage(event.data.jobId, () => getStorageInfo());
+    return;
+  }
+  if (event.data.type === 'clear_storage') {
+    const target: ClearTarget = event.data.target;
+    void replyWithStorage(event.data.jobId, () => clearStorage(target));
+    return;
+  }
   if (event.data.type === 'model_download') {
     void runModelDownload(event.data.jobId, event.data.device);
     return;
   }
   void runNarration(event.data);
 });
+
+async function replyWithStorage(
+  jobId: string,
+  action: () => Promise<Awaited<ReturnType<typeof getStorageInfo>>>,
+): Promise<void> {
+  try {
+    send({type: 'storage_info', jobId, ...(await action())});
+  } catch (error: unknown) {
+    console.error('Storage request failed:', error);
+    send({
+      type: 'error',
+      jobId,
+      message: error instanceof Error ? error.message : 'Storage request failed.',
+    });
+  }
+}
 
 async function runModelDownload(
   jobId: string,
@@ -132,6 +168,9 @@ async function runModelDownload(
     );
     send({type: 'model_status', jobId, installed: true});
   } catch (error: unknown) {
+    if (!controller.signal.aborted) {
+      console.error('Model download failed:', error);
+    }
     send({
       type: 'error',
       jobId,
@@ -184,6 +223,9 @@ async function runNarration(request: NarrateMessage): Promise<void> {
       [result.audio],
     );
   } catch (error: unknown) {
+    if (!controller.signal.aborted) {
+      console.error('Narration failed:', error);
+    }
     send({
       type: 'error',
       jobId: request.jobId,
@@ -207,6 +249,8 @@ function isHostRequest(message: unknown): message is HostRequest {
     type === 'narrate' ||
     type === 'cancel' ||
     type === 'model_status' ||
+    type === 'storage_info' ||
+    type === 'clear_storage' ||
     type === 'model_download' ||
     type === 'warmup'
   );

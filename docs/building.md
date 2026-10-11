@@ -98,8 +98,8 @@ flowchart LR
 ```
 
 - Chrome rejects `background.scripts` in MV3; Firefox does not run `background.service_worker`.
-- Browsers accept only numeric `version`. `0.1.0-beta.2` becomes version `0.1.0.2`
-  and `version_name` `0.1.0-beta.2` (Chrome shows it; Firefox drops the key).
+- Browsers accept only numeric `version`. `0.1.0-beta.3` becomes version `0.1.0.3`
+  and `version_name` `0.1.0-beta.3` (Chrome shows it; Firefox drops the key).
   See [Releasing](releasing.md#version-mapping).
 - The Firefox `gecko.id` in `manifest.mjs` is a placeholder
   (`narrately@example.invalid`). That is fine while Narrately is distributed only

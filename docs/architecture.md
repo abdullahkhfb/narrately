@@ -48,7 +48,7 @@ flowchart TB
 | Inference worker | `src/inference/worker.ts` | ES module worker | Load Kokoro, synthesize one chunk at a time, enforce the local-only fetch guard |
 | Background | `src/background/index.ts` | IIFE (classic) | Seed default settings on install; handle settings, panel, and debug-log messages; retain up to 100 local diagnostic records |
 | Popup | `src/popup/index.ts` | ES module | Edit settings (reads and writes `storage.local` directly), ask the active tab to open its panel |
-| Debug page | `src/popup/debug.ts` | ES module | Display captured Narrately warnings/errors and copy the report; cannot read unrelated browser or page console output |
+| Debug page | `src/popup/debug.ts` | ES module | Display captured Narrately warnings/errors as a colour-coded list in a fixed-size window, and copy or clear the report; cannot read unrelated browser or page console output |
 
 The manifest declares both Chrome's and Firefox's background style in neutral
 form; [`scripts/manifest.mjs`](../scripts/manifest.mjs) emits only the key each
@@ -65,7 +65,7 @@ sequenceDiagram
     participant DB as IndexedDB audio_cache
     participant Worker as Inference worker
 
-    User->>Panel: Generate narration
+    User->>Panel: Narrate this chapter
     Panel->>Host: narrate {text, voiceId, speed, device, cacheEnabled}
     Host->>Rust: validate_synthesis_request
     Rust-->>Host: "" or error message
@@ -108,10 +108,10 @@ stateDiagram-v2
     NeedsModel --> Downloading: Download model
     Downloading --> NeedsModel: cancelled or failed
     Downloading --> Ready: all files verified and cached
-    Ready --> Preparing: Generate narration
+    Ready --> Preparing: Narrate this chapter
     Preparing --> Ready: cancelled or failed
     Preparing --> Playable: result received
-    Playable --> Preparing: Generate again
+    Playable --> Preparing: Narrate again
 ```
 
 When the panel opens and the model is already installed, it is also pre-loaded

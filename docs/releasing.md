@@ -8,7 +8,7 @@ local builds.
 | Tag | Manifest `version` | Manifest `version_name` | Release type |
 | --- | --- | --- | --- |
 | `v0.1.0-beta.1` | `0.1.0.1` | `0.1.0-beta.1` | pre-release (Beta badge in the UI) |
-| `v0.1.0-beta.2` | `0.1.0.2` | `0.1.0-beta.2` | pre-release |
+| `v0.1.0-beta.3` | `0.1.0.3` | `0.1.0-beta.3` | pre-release |
 | `v1.0.0` | `1.0.0` | (none) | stable |
 
 Browsers accept only numeric `version` values, so the beta number becomes the
@@ -18,17 +18,17 @@ format: `vX.Y.Z` or `vX.Y.Z-beta.N`. Anything else fails the first workflow job.
 
 ```mermaid
 flowchart LR
-    tag["git tag<br/>v0.1.0-beta.2"] --> strip["strip v<br/>0.1.0-beta.2"]
+    tag["git tag<br/>v0.1.0-beta.3"] --> strip["strip v<br/>0.1.0-beta.3"]
     strip --> npm["package.json version"]
     npm --> mf["versionFields()"]
-    mf --> ver["manifest version<br/>0.1.0.2"]
-    mf --> name["manifest version_name<br/>0.1.0-beta.2<br/>(Chrome only)"]
+    mf --> ver["manifest version<br/>0.1.0.3"]
+    mf --> name["manifest version_name<br/>0.1.0-beta.3<br/>(Chrome only)"]
     strip --> pre{"contains -beta.?"}
     pre -- yes --> prerelease["GitHub pre-release"]
     pre -- no --> stable["stable release"]
 ```
 
-**Ordering rule:** browsers compare versions numerically, and `0.1.0.2` is newer
+**Ordering rule:** browsers compare versions numerically, and `0.1.0.3` is newer
 than `0.1.0`. A stable release therefore needs a higher `X.Y.Z` than every beta
 before it (for example betas of `0.1.0`, then stable `1.0.0` or `0.2.0`), or
 users on the beta will not be offered the update.
@@ -39,7 +39,7 @@ users on the beta will not be offered the update.
 2. Tag and publish a GitHub release, for example:
 
    ```bash
-   gh release create v0.1.0-beta.2 --title "0.1.0-beta.2" --notes-file CHANGELOG.md --prerelease
+   gh release create v0.1.0-beta.3 --title "0.1.0-beta.3" --notes-file CHANGELOG.md --prerelease
    ```
 
 3. The **Release build** workflow tests, builds and attaches

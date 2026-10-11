@@ -2,6 +2,7 @@
  * @fileoverview Messages exchanged between extension contexts.
  */
 
+import type {ClearTarget} from './storageManager';
 import type {NarrationSettings} from './types';
 
 export interface DebugErrorRecord {
@@ -39,7 +40,12 @@ export interface GetDebugErrorsMessage {
   type: 'get_debug_errors';
 }
 
+export interface ClearDebugErrorsMessage {
+  type: 'clear_debug_errors';
+}
+
 export type BackgroundMessage =
+  | ClearDebugErrorsMessage
   | GetSettingsMessage
   | SetSettingsMessage
   | GetVoiceCatalogMessage
@@ -97,7 +103,22 @@ export interface WarmupRequest {
   device: 'wasm' | 'webgpu';
 }
 
+/** Content script -> host page: how much space do chapters and the model use? */
+export interface StorageInfoRequest {
+  type: 'storage_info';
+  jobId: string;
+}
+
+/** Content script -> host page: delete cached chapters and/or the model. */
+export interface ClearStorageRequest {
+  type: 'clear_storage';
+  jobId: string;
+  target: ClearTarget;
+}
+
 export type HostRequest =
+  | StorageInfoRequest
+  | ClearStorageRequest
   | NarrateMessage
   | CancelMessage
   | ModelStatusRequest
@@ -150,7 +171,17 @@ export interface ModelStatusMessage {
   installed: boolean;
 }
 
+/** Host -> content script: current storage use (also the reply to a clear). */
+export interface StorageInfoMessage {
+  type: 'storage_info';
+  jobId: string;
+  chapterEntries: number;
+  chapterBytes: number;
+  modelBytes: number;
+}
+
 export type WorkerMessage =
+  | StorageInfoMessage
   | ModelStatusMessage
   | ReadyMessage
   | ProgressMessage

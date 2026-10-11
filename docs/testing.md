@@ -71,12 +71,12 @@ optional, best-effort checks. When you add a site, add its own row to the checkl
 | # | Step | Expected result |
 | --- | --- | --- |
 | 1 | Open a Lnori volume with multi-part chapters, such as *The Apothecary Diaries*, Volume 1 | A round bubble appears; the chapter list shows chapter names, image-only selectors do not create entries, and untitled text selectors continue the preceding chapter |
-| 2 | Click the bubble | The panel opens: chapter and voice selects, speed slider, text preview toggle, Generate button, status line |
-| 3 | First run, no model | A "Voice model needed" card offers **Download model**; Generate is disabled |
+| 2 | Click the bubble | The panel opens as a fixed-size card with nothing to scroll: chapter picker with previous/next, voice select, speed buttons (1×, 1.25×, 1.5×), a character and minutes summary with **Preview text**, the **Narrate this chapter** button, a status line, and a storage icon in the header |
+| 3 | First run, no model | A "Download the voice first" card offers **Download model**; **Narrate this chapter** is disabled |
 | 4 | Click **Download model** | Progress with a cancel option; ends with "Voice model ready."; works again after reloading the page |
-| 5 | Toolbar icon, popup | Voice list has 11 entries; change device or speed, **Save settings** shows "Saved locally." |
-| 6 | Popup, **Open narrator on this page** | The in-page panel opens |
-| 7 | Panel, **Generate narration** | Progress with part count and time estimate; the player appears when the chapter is ready |
+| 5 | Toolbar icon, popup | The popup fits without scrolling. Voice list has 11 entries; change device or speed (1×, 1.25×, 1.5×) and "Saved" appears briefly (settings save automatically) |
+| 6 | Popup, **Narrate this page** | The in-page panel opens |
+| 7 | Panel, **Narrate this chapter** | Progress with part count and time estimate; the player appears when the chapter is ready |
 | 8 | Generate the same chapter again, cache on | Finishes much faster (IndexedDB hits) |
 | 9 | Close the panel mid-generation | Preparation continues; a green dot shows on the bubble when ready |
 | 10 | **Download** | Save dialog offers `<book> - <chapter>.wav`; plays in any audio player |
@@ -84,7 +84,10 @@ optional, best-effort checks. When you add a site, add its own row to the checkl
 | 12 | Console | No `SyntaxError` from `content.js`, no `SecurityError` from `new Worker`, no `Blocked remote inference request` |
 | 13 | Disable the extension | Panel disappears; the page keeps working |
 | 14 | Open a book in the Cyrisia reader | The bubble appears once the book has rendered; the chapter list holds the rendered sections with narration text free of menus. The home page and library pages show no bubble |
-| 15 | Panel, drag or wheel the **Speed** slider | The value changes without scrolling the panel or the page, and arrow keys do not turn the reader's page. With a chapter prepared, playback speed follows the slider |
+| 15 | Panel, click the **1×**, **1.25×** and **1.5×** buttons | The chosen preset is highlighted, arrow keys do not turn the reader's page, and with a chapter prepared playback speed changes immediately |
+| 17 | Panel, click **Preview text**, then **Done**; click the storage icon, then **Back to narration**; press Esc inside each | Each opens inside the same card and returns to the main view. Esc steps back first and closes the panel only from the main view |
+| 18 | Narrate a chapter, open Storage (panel or popup), click **Clear** next to *Narrated chapters* | Narrated chapters drops to 0 and the voice model size is unchanged; **Narrate this chapter** stays enabled (no download card). **Delete** next to *Voice model* does the reverse, and **Clear everything** removes both |
+| 19 | Popup, click **Manage**, then **Back** | The storage view replaces the settings in the same popup, showing the total, a chapters row (**Clear**), a model row (**Delete**) and **Clear everything**; **Back** returns to the settings |
 | 16 | Open a Novel Archive chapter page | The bubble appears with the novel and chapter titles; narration contains the chapter text without translator/editor credits |
 
 Tip for step 11: in Chrome the worker's requests appear under the

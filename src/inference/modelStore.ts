@@ -7,6 +7,7 @@
  */
 
 import {extensionUrl} from '../shared/extensionUrl';
+import {MODEL_CACHE_NAME as CACHE_NAME} from '../shared/storageManager';
 
 const REVISION = 'f46687f7e41512228ae953af24a11b2640ea0f22';
 const REMOTE_BASE =
@@ -14,7 +15,6 @@ const REMOTE_BASE =
   `https://huggingface.co/onnx-community/Kokoro-82M-ONNX/resolve/${REVISION}`;
 
 export const MODEL_PATH = 'models/onnx-community/Kokoro-82M-ONNX/';
-const CACHE_NAME = 'narrately-model-v1';
 
 /** The Cache API rejects chrome-extension:// keys, so files are stored
  * under a synthetic https key derived from the model-relative path. */

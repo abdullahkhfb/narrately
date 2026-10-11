@@ -108,6 +108,37 @@ export async function loadKokoro(
   loadedDevice = device;
 }
 
+// Short + paragraph-sized, so the GPU kernels for both regimes are compiled.
+const WARMUP_TEXTS = [
+  'Hello there.',
+  'The quick brown fox jumped over the lazy dog, and then, after a long pause, ' +
+    'she asked whether anyone had seen the old lighthouse keeper since the storm.',
+];
+
+/**
+ * Loads the model and, on WebGPU, runs two throwaway inferences. The first
+ * real run otherwise pays for WGSL shader compilation and pipeline creation
+ * (often seconds), which lands on the user's first chunk. WASM has no such
+ * cost, so it skips the dummy runs.
+ */
+export async function warmupKokoro(
+  device: InferenceDevice,
+  voiceId = 'af_heart',
+): Promise<void> {
+  await loadKokoro(device, () => {});
+  if (device !== 'webgpu' || !instance) {
+    return;
+  }
+  try {
+    for (const text of WARMUP_TEXTS) {
+      await instance.generate(text, {voice: voiceId as KokoroVoiceId, speed: 1});
+    }
+  } catch (error: unknown) {
+    // Warmup is an optimization; never fail the real request because of it.
+    console.warn('Kokoro warmup run failed:', error);
+  }
+}
+
 /** Synthesizes audio without network access. */
 export async function synthesizeLocal(
   text: string,
@@ -122,12 +153,17 @@ export async function synthesizeLocal(
 
   // Voice IDs are already validated against the curated catalog by the
   // Rust core, so the kokoro-js voice union can be restored safely.
+  const started = performance.now();
   const result = await instance.generate(text, {
     voice: voiceId as KokoroVoiceId,
     speed,
   });
   const data = result.audio as Float32Array;
   const audio = float32ToWav(data, SAMPLE_RATE);
+  const elapsed = performance.now() - started;
+  console.info(
+    `[narrately] ${device}: ${text.length} chars -> ${(data.length / SAMPLE_RATE).toFixed(1)} s audio in ${Math.round(elapsed)} ms (${((data.length / SAMPLE_RATE) / (elapsed / 1000)).toFixed(1)}x realtime)`,
+  );
 
   return {
     audio,
