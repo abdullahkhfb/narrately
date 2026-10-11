@@ -101,14 +101,14 @@ flowchart LR
 - Browsers accept only numeric `version`. `0.1.0-beta.3` becomes version `0.1.0.3`
   and `version_name` `0.1.0-beta.3` (Chrome shows it; Firefox drops the key).
   See [Releasing](releasing.md#version-mapping).
-- The Firefox `gecko.id` in `manifest.mjs` is a placeholder
-  (`narrately@example.invalid`). That is fine while Narrately is distributed only
-  through GitHub Releases; it would need a real ID before any store submission.
+- The Firefox `gecko.id` in `manifest.mjs` is
+  `narrately@github.io`. Use this exact ID for the AMO listing and
+  keep it unchanged for future updates.
 
 ## Distribution
 
-Narrately is in beta and is distributed **only through GitHub Releases**. It is
-not published to the Chrome Web Store or Firefox Add-ons.
+Narrately is in beta and is distributed through GitHub Releases. Firefox Add-ons
+publishing still needs to be configured.
 
 - **Chrome:** users unzip `narrately-<version>-chrome.zip` and use *Load unpacked*.
 - **Firefox:** users unzip `narrately-<version>-firefox.zip` and load `manifest.json`

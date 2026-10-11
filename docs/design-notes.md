@@ -64,7 +64,7 @@ browser restriction made the obvious approach fail. Read the relevant note befor
 - The audio cache has no eviction policy and is keyed without model or device.
 - Output format is WAV only (`OutputFormat = 'wav'`).
 - Firefox shows the numeric version only; `version_name` is Chrome-only.
-- The Firefox `gecko.id` is a placeholder (not needed while distribution is GitHub-only).
+- The Firefox `gecko.id` is `narrately@github.io`; keep it stable for AMO updates.
 - Beta builds are not store-listed; Firefox builds are unsigned and load only as temporary add-ons.
 - `validate_voice_embedding` and the `local_embedding` voice kind are
   scaffolding for future work and are not wired into the UI.
