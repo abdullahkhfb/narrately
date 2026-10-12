@@ -128,6 +128,9 @@ Open them from the toolbar icon.
 - The voice download comes from Hugging Face. The main voice file is checked to
   make sure it is the right one before it is used.
 
+Read the [full privacy policy](PRIVACY.md) for details about local storage,
+diagnostic logs, and network connections.
+
 ## Screenshots
 
 Captured in Chromium from the extension's own panel, popup and Debug page, with sample
