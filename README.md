@@ -54,7 +54,8 @@ You install Narrately from this project's **Releases** page.
 Firefox removes temporary add-ons when it closes, so you will need to repeat these
 steps after restarting Firefox.
 
-**Requirements:** Chrome 121 or newer, or Firefox 128 or newer.
+**Requirements:** Chrome 121 or newer, or desktop Firefox 140 or newer.
+Firefox for Android is not supported yet.
 
 ## First-time setup: download the voice
 

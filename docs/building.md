@@ -94,7 +94,7 @@ flowchart LR
     base["manifest.json<br/>background.service_worker"] --> fn{"manifestFor(target)"}
     ver["package.json version"] --> fn
     fn -->|chrome| c["version + version_name<br/>background.service_worker<br/>minimum_chrome_version 121"]
-    fn -->|firefox| f["version only<br/>background.scripts<br/>browser_specific_settings.gecko<br/>strict_min_version 128.0"]
+    fn -->|firefox| f["version only<br/>background.scripts<br/>Desktop Firefox 140+<br/>data_collection_permissions: none"]
 ```
 
 - Chrome rejects `background.scripts` in MV3; Firefox does not run `background.service_worker`.
@@ -104,6 +104,13 @@ flowchart LR
 - The Firefox `gecko.id` in `manifest.mjs` is
   `narrately@github.io`. Use this exact ID for the AMO listing and
   keep it unchanged for future updates.
+- Firefox declares `data_collection_permissions.required: ["none"]` because
+  the extension does not collect or transmit user data; model files are fetched
+  from Hugging Face, while page text and narration are processed locally.
+- Narrately currently supports desktop Firefox only. Firefox for Android is
+  not supported.
+- Firefox 140 is the minimum version, matching support for
+  `data_collection_permissions`.
 
 ## Distribution
 

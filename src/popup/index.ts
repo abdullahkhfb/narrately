@@ -8,6 +8,7 @@ import type {DebugErrorRecord} from '../shared/messages';
 import {getRequiredElement} from './dom';
 import {initializeSettingsView} from './settings-view';
 import {initializeStorageView} from './storage-view';
+import {parseSvg} from '../shared/svg';
 import logoIcon from '../icons/ui/logo.svg?raw';
 
 installDebugErrorCapture('popup', reportPopupError);
@@ -18,7 +19,7 @@ function reportPopupError(error: DebugErrorRecord): Promise<void> {
     .then(() => undefined);
 }
 
-getRequiredElement('logo', HTMLElement).innerHTML = logoIcon;
+getRequiredElement('logo', HTMLElement).replaceChildren(parseSvg(logoIcon));
 
 const manifest = browser.runtime.getManifest();
 const version = manifest.version_name ?? manifest.version;

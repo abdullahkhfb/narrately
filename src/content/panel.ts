@@ -10,6 +10,7 @@ import type {Book} from '../shared/types';
 import {detectBook} from './sites';
 import {createHostClient, type Job, type NarrationJob} from './hostClient';
 import {formatBytes, type ClearTarget, type StorageInfo} from '../shared/storageManager';
+import {parseSvg} from '../shared/svg';
 import panelCss from './panel.css?inline';
 import bubbleIcon from '../icons/ui/bubble.svg?raw';
 import closeIcon from '../icons/ui/close.svg?raw';
@@ -42,7 +43,7 @@ export function mountPanel(): boolean {
   style.textContent = panelCss;
   shadow.append(style);
   const root = document.createElement('div');
-  root.innerHTML = renderPanel(book);
+  root.append(renderPanel(book));
   shadow.append(root);
   document.documentElement.appendChild(host);
 
@@ -59,40 +60,31 @@ export function openPanel(): boolean {
   return true;
 }
 
-function renderPanel(book: Book): string {
-  const chapters = book.chapters
-    .map((c, i) => `<option value="${i}">${escapeHtml(c.title)}</option>`)
-    .join('');
-  const voices = VOICE_CATALOG.map(
-    (v) =>
-      `<option value="${v.id}" title="${escapeHtml(v.description)}">${escapeHtml(v.name)} · ${escapeHtml(v.language)}</option>`,
-  ).join('');
-  const multi = book.chapters.length > 1;
-
-  return `
-    <button class="bubble" id="toggle" aria-label="Open Narrately" aria-expanded="false">${bubbleIcon}</button>
+function renderPanel(book: Book): DocumentFragment {
+  const parsed = new DOMParser().parseFromString(`
+    <button class="bubble" id="toggle" aria-label="Open Narrately" aria-expanded="false"><span id="icon-bubble"></span></button>
     <section class="panel" id="panel" role="dialog" aria-label="Narrately narrator" hidden>
       <header class="head">
-        <span class="logo">${logoIcon}</span>
+        <span class="logo" id="icon-logo"></span>
         <div class="titles">
-          <strong>Narrately${betaBadge()}</strong>
-          <span class="book" title="${escapeHtml(book.title)}">${escapeHtml(book.title)}</span>
+          <strong id="brand">Narrately</strong>
+          <span class="book" id="book-title"></span>
         </div>
-        <button class="icon" id="open-storage" aria-label="Storage on this device" title="Storage">${storageIcon}</button>
-        <button class="icon" id="close" aria-label="Close">${closeIcon}</button>
+        <button class="icon" id="open-storage" aria-label="Storage on this device" title="Storage"><span id="icon-storage"></span></button>
+        <button class="icon" id="close" aria-label="Close"><span id="icon-close"></span></button>
       </header>
       <div class="views">
         <div class="body" id="view-listen">
           <div class="field">
             <span class="label" id="chapter-label">Chapter</span>
             <div class="chapter-row">
-              <button class="icon" id="prev" aria-label="Previous chapter" ${multi ? '' : 'disabled'}>‹</button>
-              <select id="chapter" aria-label="Chapter">${chapters}</select>
-              <button class="icon" id="next" aria-label="Next chapter" ${multi ? '' : 'disabled'}>›</button>
+              <button class="icon" id="prev" aria-label="Previous chapter">‹</button>
+              <select id="chapter" aria-label="Chapter"></select>
+              <button class="icon" id="next" aria-label="Next chapter">›</button>
             </div>
           </div>
           <div class="row">
-            <label class="field grow"><span class="label">Voice</span><select id="voice">${voices}</select></label>
+            <label class="field grow"><span class="label">Voice</span><select id="voice"></select></label>
             <div class="field">
               <span class="label">Speed</span>
               <input id="speed" type="hidden" value="1">
@@ -117,10 +109,10 @@ function renderPanel(book: Book): string {
             <input id="seek" type="range" min="0" max="1000" value="0" aria-label="Seek">
             <div class="times"><span id="cur">0:00</span><span id="dur">0:00</span></div>
             <div class="controls">
-              <button class="icon" id="back" aria-label="Back ${SKIP_SECONDS} seconds">${rewindIcon}</button>
-              <button class="icon round" id="play" aria-label="Play">${playIcon}</button>
-              <button class="icon" id="forward" aria-label="Forward ${SKIP_SECONDS} seconds">${forwardIcon}</button>
-              <button class="icon" id="download" aria-label="Download WAV">${downloadIcon}</button>
+              <button class="icon" id="back" aria-label="Back 15 seconds"><span id="icon-rewind"></span></button>
+              <button class="icon round" id="play" aria-label="Play"></button>
+              <button class="icon" id="forward" aria-label="Forward 15 seconds"><span id="icon-forward"></span></button>
+              <button class="icon" id="download" aria-label="Download WAV"><span id="icon-download"></span></button>
             </div>
           </div>
           <div class="spacer"></div>
@@ -163,7 +155,66 @@ function renderPanel(book: Book): string {
         </div>
       </div>
     </section>
-  `;
+  `, 'text/html');
+  const fragment = document.createDocumentFragment();
+  for (const node of Array.from(parsed.body.childNodes)) {
+    fragment.append(document.importNode(node, true));
+  }
+
+  const query = <T extends Element>(selector: string): T => {
+    const element = fragment.querySelector<T>(selector);
+    if (!element) {
+      throw new Error(`Panel template is missing ${selector}.`);
+    }
+    return element;
+  };
+  const bookTitle = query<HTMLElement>('#book-title');
+  bookTitle.textContent = book.title;
+  bookTitle.title = book.title;
+
+  const chapter = query<HTMLSelectElement>('#chapter');
+  book.chapters.forEach((item, index) => {
+    const option = document.createElement('option');
+    option.value = String(index);
+    option.textContent = item.title;
+    chapter.append(option);
+  });
+  const multi = book.chapters.length > 1;
+  query<HTMLButtonElement>('#prev').disabled = !multi;
+  query<HTMLButtonElement>('#next').disabled = !multi;
+
+  const voice = query<HTMLSelectElement>('#voice');
+  for (const item of VOICE_CATALOG) {
+    const option = document.createElement('option');
+    option.value = item.id;
+    option.title = item.description;
+    option.textContent = `${item.name} · ${item.language}`;
+    voice.append(option);
+  }
+
+  const versionName = browser.runtime.getManifest().version_name ?? '';
+  if (versionName.includes('-')) {
+    const badge = document.createElement('span');
+    badge.className = 'beta';
+    badge.title = versionName;
+    badge.textContent = 'Beta';
+    query('#brand').append(' ', badge);
+  }
+
+  const icons = [
+    ['#icon-bubble', bubbleIcon],
+    ['#icon-logo', logoIcon],
+    ['#icon-storage', storageIcon],
+    ['#icon-close', closeIcon],
+    ['#icon-rewind', rewindIcon],
+    ['#icon-forward', forwardIcon],
+    ['#icon-download', downloadIcon],
+    ['#play', playIcon],
+  ] as const;
+  for (const [selector, icon] of icons) {
+    query(selector).append(parseSvg(icon));
+  }
+  return fragment;
 }
 
 async function wirePanel(root: ParentNode, book: Book): Promise<void> {
@@ -597,7 +648,7 @@ async function wirePanel(root: ParentNode, book: Book): Promise<void> {
 
   // Player controls.
   const setIcon = (): void => {
-    play.innerHTML = audio.paused ? playIcon : pauseIcon;
+    play.replaceChildren(parseSvg(audio.paused ? playIcon : pauseIcon));
     play.setAttribute('aria-label', audio.paused ? 'Play' : 'Pause');
     toggle.classList.toggle('playing', !audio.paused);
   };
@@ -686,17 +737,6 @@ function sanitizeFilename(value: string): string {
   );
 }
 
-function escapeHtml(value: string): string {
-  const entities: Record<string, string> = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;',
-  };
-  return value.replace(/[&<>"']/g, (c) => entities[c] ?? c);
-}
-
 function getErrorMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : 'Narration failed.';
   if (isExtensionContextInvalidated(error)) {
@@ -710,14 +750,6 @@ function getErrorMessage(error: unknown): string {
 
 function isExtensionContextInvalidated(error: unknown): boolean {
   return error instanceof Error && /extension context invalidated/i.test(error.message);
-}
-
-/** A "Beta" pill when the installed build is a pre-release. */
-function betaBadge(): string {
-  const name = browser.runtime.getManifest().version_name ?? '';
-  return name.includes('-')
-    ? ` <span class="beta" title="${escapeHtml(name)}">Beta</span>`
-    : '';
 }
 
 function formatDuration(seconds: number): string {
