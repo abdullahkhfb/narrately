@@ -69,26 +69,28 @@ Every UI view and icon lives in its own dedicated asset file:
 ```mermaid
 sequenceDiagram
     actor User
-    participant Panel as Panel (content.js)
-    participant Host as Host page (host.js)
-    participant Rust as Rust core (WASM)
-    participant DB as IndexedDB audio_cache
-    participant Worker as Inference worker
+    participant Panel as "Panel (content.js)"
+    participant Host as "Host page (host.js)"
+    participant Rust as "Rust core (WASM)"
+    participant DB as "IndexedDB audio_cache"
+    participant Worker as "Inference worker"
 
     User->>Panel: Narrate this chapter
     Panel->>Host: narrate {text, voiceId, speed, device, cacheEnabled}
     Host->>Rust: validate_synthesis_request
-    Rust-->>Host: "" or error message
+    Rust-->>Host: empty string or error message
     Host->>Rust: chunk_text(text, 480)
-    Rust-->>Host: chunks[] (zero-copy Cow slices -> JSON)
+    Rust-->>Host: chunks[] (zero-copy Cow slices to JSON)
     Host->>Host: deduplicate identical chunks
     alt cacheEnabled
         Host->>Rust: cacheKeys(uniqueChunks, voice, speed)
+        Rust-->>Host: uniqueKeys[]
         Host->>DB: readCacheMany(uniqueKeys) (single transaction)
+        DB-->>Host: cachedAudioMap
     end
     loop each cache-miss unique chunk (2-chunk lookahead)
         Host->>Worker: synthesize {chunk, voice, speed, device}
-        Worker-->>Host: WAV ArrayBuffer + duration
+        Worker-->>Host: result {audio, durationMs}
         opt cacheEnabled
             Host->>DB: put(key, audio) (shared IDBDatabase connection)
         end
@@ -96,7 +98,7 @@ sequenceDiagram
     end
     Host->>Host: merge WAV chunks (single-pass validation)
     Host-->>Panel: result {audio, durationMs} (ArrayBuffer transferred)
-    Panel->>User: player ready (blob URL; raw ArrayBuffer released)
+    Panel->>User: player ready (blob URL, raw ArrayBuffer released)
 ```
 
 Details worth knowing:
