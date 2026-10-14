@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.0-beta.4
+
+- Optimized the Rust chunking algorithm (`crates/narrately-core/src/chunker.rs` and `lib.rs`) with zero-copy `Cow<'_, str>` slice borrowing, denser sentence/word packing across paragraph boundaries, punctuation and quote grouping, and UTF-8 character-boundary splitting.
+- Improved narration pipeline throughput (`src/core/rustCore.ts` and `src/core/narration.ts`) with synchronous WASM readiness checks, batched SHA-256 key generation (`cacheKeys`), upfront chunk deduplication, single-connection IndexedDB reuse per chapter, and single-pass WAV merging.
+- Extracted each UI asset into its own dedicated file: added `src/content/panel.html`, `src/popup/debug.css`, `src/icons/ui/prev.svg`, and `src/icons/ui/next.svg`, replaced the inline `<svg>` in `src/popup/debug.html` with `src/icons/ui/logo.svg`, and removed unused `src/content.css`, `src/icons/ui/gear.svg`, and `src/icons/ui/minimize.svg`.
+- Consolidated shared DOM, cached SVG prototype cloning, and storage meter/clear controllers into `src/shared/dom.ts` and `src/shared/storageView.ts`, and unified multi-part chapter merging (`mergeChapterPart`) in `src/content/sites/text.ts`.
+- Reduced runtime memory footprint across contexts: lazily mount the hidden host `<iframe>` on first panel open, lazily spawn the inference `Worker` on warmup/synthesis, release raw PCM `ArrayBuffer` references in `panel.ts` once the `Blob` URL is created, and clear streamed model chunks before SHA-256 verification in `modelStore.ts`.
+- Silenced the Chromium Windows WebGPU `requestAdapter()` `powerPreference` warning (`https://crbug.com/369219127`) via `src/shared/webgpu.ts` while preserving `powerPreference` on macOS and Linux.
+
 ## 0.1.0-beta.3
 
 - Redesigned the in-page panel as a fixed-size card with chapter, voice, speed, text preview, and playback controls; text preview and Storage open as views within the card.

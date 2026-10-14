@@ -29,13 +29,13 @@ flowchart TD
 
     subgraph buildts["scripts/build-ts.mjs"]
         p1["Pass 1: background<br/>IIFE, empties dist/"]
-        p2["Pass 2: content<br/>IIFE"]
-        p3["Pass 3: ES modules<br/>inference_worker, popup, host<br/>then copies static assets"]
+        p2["Pass 2: content<br/>IIFE (bundles panel.html, panel.css, UI SVGs)"]
+        p3["Pass 3: ES modules<br/>inference_worker, popup, debug, host<br/>then copies static assets"]
         p1 --> p2 --> p3
     end
 
     pkg --> buildts
-    ts["src/**/*.ts"] --> buildts
+    ts["src/**/*.ts + UI assets"] --> buildts
     manifest["manifest.json<br/>package.json version"] --> buildts
     models --> buildts
     buildts --> dist["dist/<br/>Chrome flavoured"]
@@ -53,30 +53,30 @@ flowchart TD
 
 Manifest-declared content and background scripts are **classic scripts**, so
 their bundles cannot contain `import`, `export` or `import.meta`. Each is built
-alone as a self-contained IIFE with dynamic imports inlined. The popup, the host
-page and the inference worker run in module-capable extension contexts and share
-one code-splitting ES-module build.
+alone as a self-contained IIFE with dynamic imports and raw UI assets (`panel.html?raw`,
+`panel.css?inline`, `src/icons/ui/*.svg?raw`) inlined. The popup, the debug window,
+the host page and the inference worker run in module-capable extension contexts
+and share one code-splitting ES-module build.
 
-The last pass also copies the manifest, icons, the `models/` folder and the
-compiled WASM package into `dist/`.
+The last pass copies the manifest, toolbar PNG icons (`src/icons/toolbar/`), the
+`models/` folder and the compiled WASM package into `dist/`.
 
 ## `dist/` layout
 
 ```text
 dist/
 ├── manifest.json
-├── assets/                  hashed assets incl. the ONNX Runtime .wasm
+├── assets/                  hashed assets incl. the ONNX Runtime .wasm and popup/debug CSS
 ├── models/                  voice packs (+ model files if you ran sync-model)
 └── src/
     ├── background.js        classic: Chrome service worker / Firefox event page
-    ├── content.js           classic: content script
-    ├── content.css
+    ├── content.js           classic: content script (with panel.html, panel.css, UI SVGs inlined)
     ├── inference_worker.js  ES module worker (Kokoro inference)
     ├── host.js, inference/host.html   extension-origin bridge iframe
-    ├── popup.js, popup/     popup page
-    ├── chunks/              shared module chunks (worker, popup, host only)
+    ├── popup.js, debug.js, popup/     popup and debug window pages
+    ├── chunks/              shared module chunks (worker, popup, debug, host only)
     ├── wasm/pkg/            compiled Rust core (glue JS + .wasm)
-    └── icons/
+    └── icons/toolbar/       toolbar PNG icons (16, 48, 128)
 ```
 
 The ONNX Runtime WebAssembly binary ships as a Vite asset inside `dist/assets/`.
@@ -98,8 +98,8 @@ flowchart LR
 ```
 
 - Chrome rejects `background.scripts` in MV3; Firefox does not run `background.service_worker`.
-- Browsers accept only numeric `version`. `0.1.0-beta.3` becomes version `0.1.0.3`
-  and `version_name` `0.1.0-beta.3` (Chrome shows it; Firefox drops the key).
+- Browsers accept only numeric `version`. `0.1.0-beta.4` becomes version `0.1.0.4`
+  and `version_name` `0.1.0-beta.4` (Chrome shows it; Firefox drops the key).
   See [Releasing](releasing.md#version-mapping).
 - The Firefox `gecko.id` in `manifest.mjs` is
   `narrately@github.io`. Use this exact ID for the AMO listing and

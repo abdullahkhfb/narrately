@@ -1,0 +1,138 @@
+body.debug-page {
+  display: flex;
+  flex-direction: column;
+  width: auto;
+  height: 100vh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+body.debug-page main {
+  flex: 1;
+  min-height: 0;
+}
+
+#debug-view {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+.count {
+  flex: none;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: #1f1f23;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.log {
+  flex: 1;
+  min-height: 0;
+  padding: 12px;
+  overflow: auto;
+  border-radius: 12px;
+  background: var(--card);
+  color: #d4d4d8;
+  font: 11.5px/1.5 ui-monospace, Menlo, Consolas, monospace;
+}
+
+.log .empty {
+  margin: 0;
+  color: var(--faint);
+  font: 12px/1.5 system-ui, sans-serif;
+}
+
+.entry {
+  display: grid;
+  grid-template-columns: 8px 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.entry:last-child {
+  margin-bottom: 0;
+}
+
+.entry .lvl {
+  width: 6px;
+  height: 6px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--danger);
+}
+
+.entry.warning .lvl {
+  background: #fbbf24;
+}
+
+.entry .meta {
+  display: block;
+  color: var(--faint);
+  font-size: 11px;
+}
+
+.entry .msg {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.entry .more {
+  margin-top: 2px;
+  color: var(--faint);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.debug-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.debug-actions .primary {
+  height: 32px;
+  padding: 0 14px;
+  font-size: 12.5px;
+}
+
+.debug-actions .quiet {
+  height: 32px;
+  background: #1f1f23;
+}
+
+.debug-actions .spacer {
+  flex: 1;
+}
+
+a.support-button {
+  display: inline-block;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--link);
+  font-size: 12px;
+  line-height: 28px;
+  text-decoration: none;
+}
+
+a.support-button:hover {
+  color: #ddd6fe;
+}
+
+#debug-status {
+  margin: 0;
+  min-height: 17px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.copy-confirmation {
+  background: #176b48 !important;
+  color: #fff !important;
+}

@@ -2,16 +2,15 @@
  * @fileoverview Local Kokoro model loading and synthesis.
  */
 
+import { installWebGpuAdapterPatch } from '../shared/webgpu';
 import {env, LogLevel} from '@huggingface/transformers';
 import {KokoroTTS} from 'kokoro-js';
-// ONNX Runtime files shipped inside the extension; transformers.js would
-// otherwise fetch them from a CDN, which the local-only guard blocks.
 import ortFactoryUrl from '../../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.asyncify.mjs?url';
 import ortWasmUrl from '../../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.asyncify.wasm?url';
-import {float32ToWav, SAMPLE_RATE} from './audio';
 import {extensionUrl} from '../shared/extensionUrl';
-import {matchCachedModelFile} from './modelStore';
 import type {InferenceDevice} from '../shared/types';
+import {float32ToWav, SAMPLE_RATE} from './audio';
+import {matchCachedModelFile} from './modelStore';
 
 const MODEL_ID = 'onnx-community/Kokoro-82M-ONNX';
 const MODEL_PATH = 'models/onnx-community/Kokoro-82M-ONNX/';
@@ -27,6 +26,8 @@ type KokoroVoiceId = Parameters<KokoroInstance['generate']>[1] extends
 let instance: KokoroInstance | undefined;
 let loadedDevice: InferenceDevice | undefined;
 let fetchGuardInstalled = false;
+
+installWebGpuAdapterPatch();
 
 function installLocalFetchGuard(): void {
   if (fetchGuardInstalled) {
@@ -61,7 +62,6 @@ function installLocalFetchGuard(): void {
     return nativeFetch(input, init);
   };
   globalThis.fetch = guardedFetch;
-  // transformers.js binds its own fetch at import time, so hook it too.
   env.fetch = guardedFetch;
   fetchGuardInstalled = true;
 }
@@ -76,11 +76,9 @@ export async function loadKokoro(
   }
   instance = undefined;
 
+  installWebGpuAdapterPatch();
   env.allowRemoteModels = false;
-  // Kokoro's model type is not in the registry, so transformers warns about
-  // falling back to a single-file model, which is exactly what Kokoro is.
   env.logLevel = LogLevel.ERROR;
-  // Blob-URL factories would violate the extension CSP, so import directly.
   env.useWasmCache = false;
   const onnxWasm = env.backends.onnx.wasm;
   if (onnxWasm) {
@@ -91,8 +89,6 @@ export async function loadKokoro(
   }
   env.allowLocalModels = true;
   env.localModelPath = extensionUrl('models/');
-  // Static import: Vite's dynamic-import preload helper needs `document`,
-  // which workers lack.
   installLocalFetchGuard();
   const loaded = await KokoroTTS.from_pretrained(MODEL_ID, {
     dtype: device === 'webgpu' ? 'fp32' : 'q8',
@@ -108,19 +104,13 @@ export async function loadKokoro(
   loadedDevice = device;
 }
 
-// Short + paragraph-sized, so the GPU kernels for both regimes are compiled.
 const WARMUP_TEXTS = [
   'Hello there.',
   'The quick brown fox jumped over the lazy dog, and then, after a long pause, ' +
     'she asked whether anyone had seen the old lighthouse keeper since the storm.',
 ];
 
-/**
- * Loads the model and, on WebGPU, runs two throwaway inferences. The first
- * real run otherwise pays for WGSL shader compilation and pipeline creation
- * (often seconds), which lands on the user's first chunk. WASM has no such
- * cost, so it skips the dummy runs.
- */
+/** Loads the model and, on WebGPU, runs two warmup inferences to precompile shaders. */
 export async function warmupKokoro(
   device: InferenceDevice,
   voiceId = 'af_heart',
@@ -134,7 +124,6 @@ export async function warmupKokoro(
       await instance.generate(text, {voice: voiceId as KokoroVoiceId, speed: 1});
     }
   } catch (error: unknown) {
-    // Warmup is an optimization; never fail the real request because of it.
     console.warn('Kokoro warmup run failed:', error);
   }
 }
@@ -151,8 +140,6 @@ export async function synthesizeLocal(
     throw new Error('Kokoro failed to initialize.');
   }
 
-  // Voice IDs are already validated against the curated catalog by the
-  // Rust core, so the kokoro-js voice union can be restored safely.
   const started = performance.now();
   const result = await instance.generate(text, {
     voice: voiceId as KokoroVoiceId,

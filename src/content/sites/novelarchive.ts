@@ -1,22 +1,33 @@
+/**
+ * @fileoverview Adapter for Novel Archive (novelarchive.cc), an officially supported site.
+ */
+
 import type {Book, Chapter} from '../../shared/types';
-import type {SiteAdapter} from './types';
 import {hostMatches, normalize} from './text';
+import type {SiteAdapter} from './types';
 
 const HOST = 'novelarchive.cc';
+const CHAPTER_HEADING = /^chapter\b/i;
+const CREDIT_LABEL = /^(translator|editor):$/i;
 
 function chapterText(article: HTMLElement): string {
-  const lines = article.innerText
-    .split(/\r?\n/)
-    .map(normalize)
-    .filter(Boolean);
+  const rawLines = article.innerText.split(/\r?\n/);
   const textLines: string[] = [];
   let skipCredit = false;
+  let seenFirstLine = false;
 
-  for (const [index, line] of lines.entries()) {
-    if (index === 0 && /^chapter\b/i.test(line)) {
+  for (const rawLine of rawLines) {
+    const line = normalize(rawLine);
+    if (!line) {
       continue;
     }
-    if (/^(translator|editor):$/i.test(line)) {
+    if (!seenFirstLine) {
+      seenFirstLine = true;
+      if (CHAPTER_HEADING.test(line)) {
+        continue;
+      }
+    }
+    if (CREDIT_LABEL.test(line)) {
       skipCredit = true;
       continue;
     }
@@ -44,7 +55,9 @@ export const novelArchiveAdapter: SiteAdapter = {
     const chapterTitle = normalize(
       doc.querySelector('#reader-chapter-title')?.textContent,
     );
-    const bookTitle = normalize(doc.querySelector('#reader-novel-title')?.textContent);
+    const bookTitle = normalize(
+      doc.querySelector('#reader-novel-title')?.textContent,
+    );
     if (!article || !chapterTitle || !bookTitle) {
       return null;
     }
@@ -54,7 +67,9 @@ export const novelArchiveAdapter: SiteAdapter = {
       return null;
     }
 
-    const chapterId = new URLSearchParams(doc.location?.search ?? '').get('chapter');
+    const chapterId = new URLSearchParams(doc.location?.search ?? '').get(
+      'chapter',
+    );
     const chapter: Chapter = {
       id: chapterId || 'current',
       title: chapterTitle,

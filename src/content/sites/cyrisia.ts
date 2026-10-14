@@ -1,24 +1,20 @@
+/**
+ * @fileoverview Adapter for Cyrisia (cyrisia.com), an officially supported site.
+ */
+
 import type {Book, Chapter} from '../../shared/types';
+import {
+  cleanTitle,
+  hostMatches,
+  mergeChapterPart,
+  normalize,
+  readParagraphs,
+  type ChapterPartState,
+} from './text';
 import type {SiteAdapter} from './types';
-import {cleanTitle, hostMatches, normalize, readParagraphs} from './text';
 
 const HOST = 'cyrisia.com';
 const MIN_SECTION_CHARS = 200;
-const CHAPTER_PREFIX = /^chapter\s+\d+\s*:\s*/i;
-const PART_SUFFIX = /\s*\(part\s+(one|two|three|four|five|six|seven|eight|nine|ten)\)$/i;
-
-const PART_NUMBER: Readonly<Record<string, number>> = {
-  one: 1,
-  two: 2,
-  three: 3,
-  four: 4,
-  five: 5,
-  six: 6,
-  seven: 7,
-  eight: 8,
-  nine: 9,
-  ten: 10,
-};
 
 const INLINE_SELECTORS = [
   'main.ch-page',
@@ -38,7 +34,6 @@ function frameDocument(frame: HTMLIFrameElement): Document | null {
   try {
     return frame.contentDocument;
   } catch {
-    // Cross-origin frame documents are inaccessible.
     return null;
   }
 }
@@ -65,7 +60,11 @@ function toChapter(
 
 function chaptersFromFrames(doc: Document): Chapter[] {
   const chapters: Chapter[] = [];
-  for (const [index, frame] of Array.from(doc.querySelectorAll('iframe')).entries()) {
+  const frames = doc.querySelectorAll('iframe');
+  let index = 0;
+  for (const frame of frames) {
+    const currentIndex = index;
+    index += 1;
     const inner = frameDocument(frame);
     if (!inner?.body) {
       continue;
@@ -74,7 +73,7 @@ function chaptersFromFrames(doc: Document): Chapter[] {
       inner.body,
       frame,
       `Chapter ${chapters.length + 1}`,
-      frame.id || `section-${index}`,
+      frame.id || `section-${currentIndex}`,
     );
     if (chapter) {
       chapters.push(chapter);
@@ -82,34 +81,23 @@ function chaptersFromFrames(doc: Document): Chapter[] {
   }
 
   const grouped: Chapter[] = [];
-  let previousPart: {title: string; number: number} | null = null;
+  let previousPart: ChapterPartState | null = null;
   for (const chapter of chapters) {
-    const partMatch = chapter.title.match(PART_SUFFIX);
-    const chapterName = chapter.title
-      .replace(CHAPTER_PREFIX, '')
-      .replace(PART_SUFFIX, '')
-      .trim();
-    const partLabel = partMatch?.[1]?.toLowerCase();
-    const partNumber = partLabel ? PART_NUMBER[partLabel] : undefined;
-    const previousChapter = grouped[grouped.length - 1];
-
-    if (
-      previousChapter &&
-      partNumber !== undefined &&
-      previousPart?.title === chapterName.toLowerCase() &&
-      previousPart.number + 1 === partNumber
-    ) {
-      previousChapter.text += `\n\n${chapter.text}`;
-      previousPart = {title: chapterName.toLowerCase(), number: partNumber};
+    const {displayTitle, nextPart, merged} = mergeChapterPart(
+      chapter.title,
+      chapter.text,
+      grouped[grouped.length - 1],
+      previousPart,
+    );
+    previousPart = nextPart;
+    if (merged) {
       continue;
     }
 
     grouped.push({
       ...chapter,
-      title: partMatch ? chapter.title.replace(PART_SUFFIX, '').trim() : chapter.title,
+      title: displayTitle,
     });
-    previousPart =
-      partNumber === 1 ? {title: chapterName.toLowerCase(), number: partNumber} : null;
   }
 
   return grouped;
@@ -117,8 +105,14 @@ function chaptersFromFrames(doc: Document): Chapter[] {
 
 function chaptersFromInline(doc: Document): Chapter[] {
   for (const selector of INLINE_SELECTORS) {
-    for (const root of Array.from(doc.querySelectorAll(selector))) {
-      const chapter = toChapter(root, root, 'Current chapter', root.id || 'current');
+    const roots = doc.querySelectorAll(selector);
+    for (const root of roots) {
+      const chapter = toChapter(
+        root,
+        root,
+        'Current chapter',
+        root.id || 'current',
+      );
       if (chapter) {
         return [chapter];
       }
@@ -138,7 +132,8 @@ export const cyrisiaAdapter: SiteAdapter = {
     }
 
     const fromFrames = chaptersFromFrames(doc);
-    const chapters = fromFrames.length > 0 ? fromFrames : chaptersFromInline(doc);
+    const chapters =
+      fromFrames.length > 0 ? fromFrames : chaptersFromInline(doc);
     if (chapters.length === 0) {
       return null;
     }

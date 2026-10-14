@@ -1,11 +1,16 @@
+/**
+ * @fileoverview Debug window controller for inspecting and copying captured logs.
+ */
+
+import logoIcon from '../icons/ui/logo.svg?raw';
 import {browser} from '../shared/browser';
 import {
   DEBUG_ERRORS_STORAGE_KEY,
   installDebugErrorCapture,
   isDebugErrorRecord,
 } from '../shared/debugErrors';
+import {getRequiredElement, parseSvg} from '../shared/dom';
 import type {DebugErrorRecord, GetDebugErrorsMessage} from '../shared/messages';
-import {getRequiredElement} from './dom';
 
 installDebugErrorCapture('debug', reportDebugError);
 
@@ -15,34 +20,38 @@ function reportDebugError(error: DebugErrorRecord): Promise<void> {
     .then(() => undefined);
 }
 
-const copyButton = getRequiredElement('copy-errors', HTMLButtonElement);
-const clearButton = getRequiredElement('clear-errors', HTMLButtonElement);
-const debugLog = getRequiredElement('debug-log', HTMLElement);
-const debugCount = getRequiredElement('debug-count', HTMLElement);
-const debugStatus = getRequiredElement('debug-status', HTMLElement);
+const $ = <T extends Element>(id: string, type: {new (): T}): T =>
+  getRequiredElement(document, id, type);
+
+$('logo', HTMLElement).replaceChildren(parseSvg(logoIcon));
+
+const copyButton = $('copy-errors', HTMLButtonElement);
+const clearButton = $('clear-errors', HTMLButtonElement);
+const debugLog = $('debug-log', HTMLElement);
+const debugCount = $('debug-count', HTMLElement);
+const debugStatus = $('debug-status', HTMLElement);
 const defaultButtonText = copyButton.textContent ?? 'Copy logs';
 
 let feedbackTimer: number | undefined;
-/** Plain-text copy of what is shown, used by the Copy button. */
-let logText = '';
+let capturedRecords: readonly DebugErrorRecord[] = [];
 
 copyButton.addEventListener('click', async () => {
-  const errors = logText.trim();
   resetCopyFeedback();
 
-  if (!errors) {
+  if (capturedRecords.length === 0) {
     debugStatus.textContent = 'No Narrately logs have been captured yet.';
     return;
   }
 
   try {
-    await copyToClipboard(errors);
+    await copyToClipboard(formatDebugErrors(capturedRecords));
     copyButton.textContent = 'Copied!';
     copyButton.classList.add('copy-confirmation');
     debugStatus.textContent = 'Errors copied. Paste them into your bug report.';
     feedbackTimer = window.setTimeout(resetCopyFeedback, 2500);
   } catch {
-    debugStatus.textContent = 'Could not copy errors. Check clipboard access and try again.';
+    debugStatus.textContent =
+      'Could not copy errors. Check clipboard access and try again.';
   }
 });
 
@@ -53,7 +62,8 @@ clearButton.addEventListener('click', async () => {
     await loadCapturedErrors();
     debugStatus.textContent = 'Logs cleared.';
   } catch {
-    debugStatus.textContent = 'Could not clear logs. Reload the extension and try again.';
+    debugStatus.textContent =
+      'Could not clear logs. Reload the extension and try again.';
   }
 });
 
@@ -67,32 +77,34 @@ browser.storage.onChanged.addListener((changes, areaName) => {
 async function loadCapturedErrors(): Promise<void> {
   const request: GetDebugErrorsMessage = {type: 'get_debug_errors'};
   try {
-    const records = await browser.runtime.sendMessage(request);
+    const records: unknown = await browser.runtime.sendMessage(request);
     if (!Array.isArray(records)) {
       throw new Error('The background returned an invalid debug report.');
     }
-    const capturedErrors = records.filter(isDebugErrorRecord);
-    logText = formatDebugErrors(capturedErrors);
-    renderLog(capturedErrors);
-    debugCount.textContent = `${capturedErrors.length} log${capturedErrors.length === 1 ? '' : 's'}`;
-    debugStatus.textContent = capturedErrors.length
-      ? `${capturedErrors.length} Narrately log${capturedErrors.length === 1 ? '' : 's'} captured.`
+    capturedRecords = records.filter(isDebugErrorRecord);
+    renderLog(capturedRecords);
+    const total = capturedRecords.length;
+    debugCount.textContent = `${total} log${total === 1 ? '' : 's'}`;
+    debugStatus.textContent = total
+      ? `${total} Narrately log${total === 1 ? '' : 's'} captured.`
       : 'No Narrately logs have been captured yet.';
   } catch {
-    debugStatus.textContent = 'Could not load captured errors. Reload the extension and try again.';
+    debugStatus.textContent =
+      'Could not load captured errors. Reload the extension and try again.';
   }
 }
 
-function renderLog(records: DebugErrorRecord[]): void {
-  debugLog.replaceChildren();
+function renderLog(records: readonly DebugErrorRecord[]): void {
   if (records.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'empty';
     empty.textContent =
       'Nothing captured yet. Narrately saves its own warnings and errors here. It cannot see other extensions or page logs.';
-    debugLog.append(empty);
+    debugLog.replaceChildren(empty);
     return;
   }
+
+  const fragment = document.createDocumentFragment();
   for (const record of records) {
     const level = record.level ?? 'error';
     const entry = document.createElement('div');
@@ -103,25 +115,30 @@ function renderLog(records: DebugErrorRecord[]): void {
     const meta = document.createElement('span');
     meta.className = 'meta';
     const when = new Date(record.timestamp);
-    const time = Number.isNaN(when.getTime()) ? record.timestamp : when.toLocaleTimeString();
+    const time = Number.isNaN(when.getTime())
+      ? record.timestamp
+      : when.toLocaleTimeString();
     meta.textContent = `${time} · ${record.source} · ${level}`;
     const message = document.createElement('div');
     message.className = 'msg';
     message.textContent = record.message;
     body.append(meta, message);
-    const more = [record.location, record.stack].filter((value): value is string => Boolean(value));
-    if (more.length) {
+    const more = [record.location, record.stack].filter(
+      (value): value is string => Boolean(value),
+    );
+    if (more.length > 0) {
       const extra = document.createElement('div');
       extra.className = 'more';
       extra.textContent = more.join('\n');
       body.append(extra);
     }
     entry.append(dot, body);
-    debugLog.append(entry);
+    fragment.append(entry);
   }
+  debugLog.replaceChildren(fragment);
 }
 
-function formatDebugErrors(records: DebugErrorRecord[]): string {
+function formatDebugErrors(records: readonly DebugErrorRecord[]): string {
   return records
     .map((record) => {
       const details = [

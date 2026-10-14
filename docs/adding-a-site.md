@@ -10,9 +10,8 @@ every other page goes through a best-effort generic fallback.
 ```mermaid
 flowchart TD
     panel["panel.ts: mountPanel()"] --> detect["detectBook()<br/>src/content/sites/index.ts"]
-    detect --> split["split SITE_ADAPTERS by host"]
-    split --> hostfirst["1. adapters whose hosts match this page"]
-    hostfirst --> others["2. remaining adapters<br/>(markup match: mirrors, local test pages)"]
+    detect --> hostfirst["1. try adapters whose hosts match this page"]
+    hostfirst --> others["2. try remaining adapters<br/>(markup match: mirrors, local test pages)"]
     others --> generic["3. generic fallback"]
     hostfirst --> found{"adapter.detect(document)<br/>returns a Book?"}
     others --> found
@@ -31,13 +30,13 @@ plain `Book` and `Chapter` types and does not care which adapter produced them.
 
 ```text
 src/content/sites/
-├── index.ts     registry (SITE_ADAPTERS) and detectBook()
-├── types.ts     the SiteAdapter interface
-├── text.ts      shared helpers: normalize, cleanTitle, readParagraphs
-├── lnori.ts     official adapter
-├── cyrisia.ts   official adapter (reads chapter pages and same-origin iframes)
+├── index.ts        registry (SITE_ADAPTERS) and detectBook()
+├── types.ts        the SiteAdapter interface
+├── text.ts         shared helpers: normalize, cleanTitle, readParagraphs, parseChapterPart
+├── lnori.ts        official adapter
+├── cyrisia.ts      official adapter (reads chapter pages and same-origin iframes)
 ├── novelarchive.ts official adapter (reads the current chapter page)
-└── generic.ts   best-effort fallback (never listed in SITE_ADAPTERS)
+└── generic.ts      best-effort fallback (never listed in SITE_ADAPTERS)
 docs/assets/sites/
 ├── lnori.svg        site logo for the README (dark artwork)
 ├── lnori-white.svg  same logo for dark color schemes
@@ -63,20 +62,13 @@ Rules for `detect`:
   than the current host's still run, so a loose adapter could claim a foreign page.
 - **One chapter needs text.** Skip chapters with no narratable paragraphs, and
   return `null` if none are left.
-- Use `readParagraphs()` so every site gets the same cleanup (whitespace,
-  navigation and boilerplate lines).
+- Use `readParagraphs()` so every site gets the same single-pass cleanup (whitespace,
+  navigation and boilerplate lines), and `parseChapterPart()` when grouping
+  multi-part chapters (`(Part One)` .. `(Part Ten)`).
 - Give each chapter a stable `id` (prefer the element's own `id`), a title, the
   joined text, and the source `element`.
 
 ## Steps
-
-```mermaid
-flowchart LR
-    a["1. Add the id<br/>to SiteId"] --> b["2. Write<br/>sites/example.ts"]
-    b --> c["3. Register in<br/>SITE_ADAPTERS"]
-    c --> d["4. Add the logo<br/>and README row"]
-    d --> e["5. Test and<br/>update docs"]
-```
 
 1. **Add the id.** In `src/shared/types.ts`, extend the union:
 
@@ -88,8 +80,8 @@ flowchart LR
 
    ```ts
    import type {Book, Chapter} from '../../shared/types';
-   import type {SiteAdapter} from './types';
    import {cleanTitle, normalize, readParagraphs} from './text';
+   import type {SiteAdapter} from './types';
 
    export const exampleAdapter: SiteAdapter = {
      id: 'example',
@@ -119,27 +111,24 @@ flowchart LR
 3. **Register it** in `src/content/sites/index.ts`:
 
    ```ts
-   export const SITE_ADAPTERS: readonly SiteAdapter[] = [lnoriAdapter, exampleAdapter];
+   export const SITE_ADAPTERS: readonly SiteAdapter[] = [
+     lnoriAdapter,
+     cyrisiaAdapter,
+     novelArchiveAdapter,
+     exampleAdapter,
+   ];
    ```
 
 4. **Add the logo and a README row.**
    - Save the logo as `docs/assets/sites/example.svg` (or `.png` when the
      site only provides a bitmap). If it is dark, also add
-     `example-white.svg` for dark color schemes. Keep the original artwork
-     unmodified and only recolor for the dark variant.
+     `example-white.svg` for dark color schemes.
    - Add a row to the "Supported websites" table in the main
      [README](../README.md), copying the Lnori row.
 
 5. **Test and document.** See the checklist below, and update
    [Architecture](architecture.md#chapter-detection) if the site needs anything
    the current contract does not cover.
-
-## No manifest change needed
-
-The content script already matches every `http(s)` page (`manifest.json`), and
-the adapter decides at runtime whether the page is one it knows. Only change the
-manifest if you decide to restrict Narrately to specific sites, which would be a
-product decision rather than part of adding an adapter.
 
 ## Checklist for a new official site
 
@@ -152,9 +141,3 @@ product decision rather than part of adding an adapter.
 - [ ] A late-rendering page still gets a panel (the content script retries for 60 s).
 - [ ] Logo and README row added, [testing checklist](testing.md) mentions the site.
 - [ ] The generic fallback still behaves the same on non-site pages.
-
-## Promoting a site from "may work" to "official"
-
-Official means there is a dedicated adapter, it is maintained against the real
-site, and it is in the README table. A site that merely happens to work through
-the generic fallback is not official, and bug reports for it are low priority.

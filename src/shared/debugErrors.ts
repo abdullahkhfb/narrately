@@ -1,6 +1,12 @@
+/**
+ * @fileoverview Captures Narrately warnings and errors across extension contexts.
+ */
+
 import type {DebugErrorRecord} from './messages';
 
 const nativeConsoleError = console.error;
+const IGNORED_WARNING_PATTERN =
+  /powerPreference option is currently ignored|crbug\.com\/369219127/i;
 
 export const DEBUG_ERRORS_STORAGE_KEY = 'debugErrors';
 
@@ -14,46 +20,65 @@ export function installDebugErrorCapture(
   const originalError = console.error;
 
   console.warn = (...args: Parameters<typeof console.warn>): void => {
+    const message = formatConsoleArguments(args);
+    if (IGNORED_WARNING_PATTERN.test(message)) {
+      return;
+    }
     originalWarn.apply(console, args);
     void safelyReport(
       reporter,
-      createDebugError(source, formatConsoleArguments(args), undefined, undefined, 'warning'),
+      createDebugError(source, message, undefined, undefined, 'warning'),
     );
   };
 
   console.error = (...args: Parameters<typeof console.error>): void => {
+    const message = formatConsoleArguments(args);
+    if (IGNORED_WARNING_PATTERN.test(message)) {
+      return;
+    }
     originalError.apply(console, args);
     void safelyReport(
       reporter,
-      createDebugError(source, formatConsoleArguments(args), undefined, undefined, 'error'),
+      createDebugError(source, message, undefined, undefined, 'error'),
     );
   };
 
   globalThis.addEventListener('error', (event: ErrorEvent) => {
     const error = event.error;
     const message = error instanceof Error ? error.message : event.message;
-    if (!message) {
+    if (!message || IGNORED_WARNING_PATTERN.test(message)) {
       return;
     }
 
     void safelyReport(
       reporter,
-      createDebugError(source, message, error instanceof Error ? error.stack : undefined, event),
-    );
-  });
-
-  globalThis.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
-    const reason = event.reason;
-    const message = reason instanceof Error ? reason.message : String(reason);
-    void safelyReport(
-      reporter,
       createDebugError(
         source,
         message,
-        reason instanceof Error ? reason.stack : undefined,
+        error instanceof Error ? error.stack : undefined,
+        event,
       ),
     );
   });
+
+  globalThis.addEventListener(
+    'unhandledrejection',
+    (event: PromiseRejectionEvent) => {
+      const reason = event.reason;
+      const message = reason instanceof Error ? reason.message : String(reason);
+      if (IGNORED_WARNING_PATTERN.test(message)) {
+        return;
+      }
+      void safelyReport(
+        reporter,
+        createDebugError(
+          source,
+          message,
+          reason instanceof Error ? reason.stack : undefined,
+        ),
+      );
+    },
+  );
 }
 
 export function isDebugErrorRecord(value: unknown): value is DebugErrorRecord {

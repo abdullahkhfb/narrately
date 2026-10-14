@@ -1,16 +1,11 @@
 /**
  * @fileoverview Extension-origin bridge page embedded by the content script.
- *
- * Content scripts run with the page's origin, so they can neither start a
- * worker from an extension URL nor share an IndexedDB cache across sites.
- * This page owns the worker, the Rust/WASM core, and the audio cache.
  */
 
-import {extensionUrl} from '../shared/extensionUrl';
-import {installDebugErrorCapture} from '../shared/debugErrors';
+import '../shared/webgpu';
 import {narrateChapter, type AudioChunk, type WorkerClient} from '../core/narration';
-import {downloadModel, isModelInstalled} from './modelStore';
-import {clearStorage, getStorageInfo, type ClearTarget} from '../shared/storageManager';
+import {installDebugErrorCapture} from '../shared/debugErrors';
+import {extensionUrl} from '../shared/extensionUrl';
 import type {
   DebugErrorRecord,
   HostRequest,
@@ -18,6 +13,12 @@ import type {
   NarrateMessage,
   WorkerMessage,
 } from '../shared/messages';
+import {
+  clearStorage,
+  getStorageInfo,
+  type ClearTarget,
+} from '../shared/storageManager';
+import {downloadModel, isModelInstalled} from './modelStore';
 
 installDebugErrorCapture('inference host', reportHostError);
 
@@ -31,44 +32,55 @@ interface Pending {
   reject: (error: Error) => void;
 }
 
-const worker = new Worker(extensionUrl('src/inference_worker.js'), {
-  type: 'module',
-});
 const pending = new Map<string, Pending>();
 const controllers = new Map<string, AbortController>();
+let workerInstance: Worker | undefined;
+let currentDevice: NarrateMessage['device'] = 'wasm';
 
-worker.addEventListener('message', (event: MessageEvent<WorkerMessage>) => {
-  const message = event.data;
-  if (message.type === 'debug_error') {
-    window.parent.postMessage(
-      {type: 'narrately_debug_error', error: message.error},
-      '*',
-    );
-  } else if (message.type === 'result') {
-    pending.get(message.jobId)?.resolve({
-      audio: message.audio,
-      durationMs: message.durationMs,
-    });
-    pending.delete(message.jobId);
-  } else if (message.type === 'error' && message.jobId) {
-    pending.get(message.jobId)?.reject(new Error(message.message));
-    pending.delete(message.jobId);
+function getWorker(): Worker {
+  if (workerInstance) {
+    return workerInstance;
   }
-});
+  const worker = new Worker(extensionUrl('src/inference_worker.js'), {
+    type: 'module',
+  });
+  worker.addEventListener('message', (event: MessageEvent<WorkerMessage>) => {
+    const message = event.data;
+    if (message.type === 'debug_error') {
+      window.parent.postMessage(
+        {type: 'narrately_debug_error', error: message.error},
+        '*',
+      );
+    } else if (message.type === 'result') {
+      pending.get(message.jobId)?.resolve({
+        audio: message.audio,
+        durationMs: message.durationMs,
+      });
+      pending.delete(message.jobId);
+    } else if (message.type === 'error' && message.jobId) {
+      pending.get(message.jobId)?.reject(new Error(message.message));
+      pending.delete(message.jobId);
+    }
+  });
 
-worker.addEventListener('error', () => {
-  for (const job of pending.values()) {
-    job.reject(new Error('The inference worker crashed.'));
-  }
-  pending.clear();
-});
+  worker.addEventListener('error', () => {
+    for (const job of pending.values()) {
+      job.reject(new Error('The inference worker crashed.'));
+    }
+    pending.clear();
+    workerInstance = undefined;
+  });
+
+  workerInstance = worker;
+  return worker;
+}
 
 const workerClient: WorkerClient = {
   synthesize(text, voiceId, speed, signal) {
+    const worker = getWorker();
     const jobId = crypto.randomUUID();
     return new Promise((resolve, reject) => {
       pending.set(jobId, {resolve, reject});
-      // Lets the worker skip this job if it is still queued when cancelled.
       signal?.addEventListener(
         'abort',
         () => {
@@ -90,9 +102,6 @@ const workerClient: WorkerClient = {
   },
 };
 
-// The device is fixed per narration request, so chunks share it.
-let currentDevice: NarrateMessage['device'] = 'wasm';
-
 window.addEventListener('message', (event: MessageEvent<unknown>) => {
   if (event.source !== window.parent || !isHostRequest(event.data)) {
     return;
@@ -102,7 +111,10 @@ window.addEventListener('message', (event: MessageEvent<unknown>) => {
     return;
   }
   if (event.data.type === 'warmup') {
-    worker.postMessage({type: 'warmup', device: event.data.device} satisfies InferenceMessage);
+    getWorker().postMessage({
+      type: 'warmup',
+      device: event.data.device,
+    } satisfies InferenceMessage);
     return;
   }
   if (event.data.type === 'model_status') {
@@ -228,7 +240,7 @@ async function runNarration(request: NarrateMessage): Promise<void> {
     }
     send({
       type: 'error',
-      jobId: request.jobId,
+      jobId,
       message: error instanceof Error ? error.message : 'Narration failed.',
     });
   } finally {

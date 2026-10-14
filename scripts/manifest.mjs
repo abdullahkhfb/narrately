@@ -4,7 +4,7 @@
  * - Chrome rejects `background.scripts` in MV3, while Firefox does not run
  *   `background.service_worker`, so each target gets only its own key.
  * - Browsers only accept numeric `version` strings, so a pre-release such as
- *   `0.1.0-beta.3` becomes version `0.1.0.3` plus a human-readable
+ *   `0.1.0-beta.4` becomes version `0.1.0.4` plus a human-readable
  *   `version_name` (Chrome shows it; Firefox does not support the key).
  */
 

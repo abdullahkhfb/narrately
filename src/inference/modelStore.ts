@@ -1,9 +1,5 @@
 /**
  * @fileoverview On-device storage for the Kokoro model files.
- *
- * Files are downloaded once from a pinned Hugging Face revision into the
- * extension origin's Cache API, keyed by the same URL the model loader asks
- * for. Builds that bundle the files under `models/` work without a download.
  */
 
 import {extensionUrl} from '../shared/extensionUrl';
@@ -16,8 +12,6 @@ const REMOTE_BASE =
 
 export const MODEL_PATH = 'models/onnx-community/Kokoro-82M-ONNX/';
 
-/** The Cache API rejects chrome-extension:// keys, so files are stored
- * under a synthetic https key derived from the model-relative path. */
 function cacheKeyFor(name: string): string {
   return `https://narrately.invalid/model/${name}`;
 }
@@ -25,7 +19,6 @@ function cacheKeyFor(name: string): string {
 interface ModelFile {
   name: string;
   sha256?: string;
-  /** Share of the overall progress bar (the ONNX file dominates). */
   weight: number;
 }
 
@@ -37,7 +30,6 @@ const SMALL_FILES: readonly ModelFile[] = [
   {name: 'tokenizer_config.json', weight: 0.01},
 ];
 
-/** WASM uses the 8-bit model; WebGPU needs the full-precision one. */
 function filesFor(device: Device): readonly ModelFile[] {
   const weights = {weight: 0.96};
   return [
@@ -53,11 +45,8 @@ function filesFor(device: Device): readonly ModelFile[] {
 }
 
 export interface DownloadProgress {
-  /** 0..1 across all files. */
   fraction: number;
-  /** Bytes received for the file currently downloading. */
   loadedBytes: number;
-  /** Size of that file, or 0 when the server did not report it. */
   totalBytes: number;
 }
 
@@ -130,13 +119,15 @@ export async function downloadModel(
     }
 
     const blob = new Blob(parts as BlobPart[]);
+    // Free chunk references before checksum allocation.
+    parts.length = 0;
+
     if (!file.sha256 && totalBytes && blob.size !== totalBytes) {
       throw new Error(`Incomplete download for ${file.name}; please retry.`);
     }
     if (file.sha256 && (await sha256Hex(blob)) !== file.sha256) {
       throw new Error(`Checksum mismatch for ${file.name}; the download was discarded.`);
     }
-    // Stored only after verification, so a partial file is never served.
     await cache.put(
       key,
       new Response(blob, {headers: {'content-type': contentTypeFor(file.name)}}),
@@ -148,7 +139,12 @@ export async function downloadModel(
 
 async function sha256Hex(blob: Blob): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer());
-  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
+  const bytes = new Uint8Array(digest);
+  let hex = '';
+  for (let i = 0; i < bytes.length; i += 1) {
+    hex += (bytes[i] as number).toString(16).padStart(2, '0');
+  }
+  return hex;
 }
 
 function contentTypeFor(name: string): string {

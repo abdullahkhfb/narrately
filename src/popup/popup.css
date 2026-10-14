@@ -1,4 +1,3 @@
-/* Narrately popup and debug page. Flat, small, minimal controls. */
 :root {
   color-scheme: dark;
   --ink: #111113;
@@ -26,16 +25,6 @@ body {
   font: 13px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
-
-/* Header */
 header {
   display: flex;
   gap: 10px;
@@ -75,8 +64,7 @@ main {
 }
 
 #settings-view,
-#storage-view,
-#debug-view {
+#storage-view {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -85,7 +73,6 @@ main {
 #settings-view[hidden],
 #storage-view[hidden] { display: none; }
 
-/* Buttons: flat and small */
 button {
   height: 32px;
   padding: 0 12px;
@@ -124,8 +111,7 @@ button.link {
 
 button.link:hover:not(:disabled) { background: none; color: #ddd6fe; }
 
-#status,
-#debug-status {
+#status {
   margin: -4px 0 0;
   color: var(--muted);
   font-size: 12px;
@@ -133,7 +119,6 @@ button.link:hover:not(:disabled) { background: none; color: #ddd6fe; }
 
 #status:empty { display: none; }
 
-/* Fields */
 .row { display: flex; gap: 8px; align-items: flex-end; }
 .grow { flex: 1; min-width: 0; }
 .field { display: grid; gap: 4px; }
@@ -195,7 +180,6 @@ select {
 .hint,
 .privacy-note { margin: 0; color: var(--faint); font-size: 12px; }
 
-/* Switch */
 .switch {
   display: flex;
   gap: 10px;
@@ -234,7 +218,6 @@ select {
 .switch input:checked + .track::after { transform: translateX(14px); }
 .switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* Cards and storage */
 .card {
   display: grid;
   gap: 8px;
@@ -294,7 +277,6 @@ button.clear-all { align-self: flex-start; }
 
 #storage-view .primary { margin-top: auto; }
 
-/* Footer links */
 .support-links {
   display: flex;
   justify-content: center;
@@ -303,8 +285,7 @@ button.clear-all { align-self: flex-start; }
 }
 
 .support-links a,
-.support-links button,
-.support-button {
+.support-links button {
   height: 28px;
   padding: 0 8px;
   border-radius: 8px;
@@ -318,66 +299,7 @@ button.clear-all { align-self: flex-start; }
 .support-links button { line-height: normal; }
 
 .support-links a:hover,
-.support-links button:hover:not(:disabled),
-.support-button:hover { background: none; color: var(--text); }
-
-/* Debug page: fills its window, nothing resizes itself */
-body.debug-page {
-  display: flex;
-  flex-direction: column;
-  width: auto;
-  height: 100vh;
-  min-height: 0;
-  overflow: hidden;
-}
-
-body.debug-page main { flex: 1; min-height: 0; }
-body.debug-page #debug-view { flex: 1; min-height: 0; gap: 10px; }
-
-.count {
-  flex: none;
-  padding: 3px 8px;
-  border-radius: 8px;
-  background: #1f1f23;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.log {
-  flex: 1;
-  min-height: 0;
-  padding: 12px;
-  overflow: auto;
-  border-radius: 12px;
-  background: var(--card);
-  color: #d4d4d8;
-  font: 11.5px/1.5 ui-monospace, Menlo, Consolas, monospace;
-}
-
-.log .empty { margin: 0; color: var(--faint); font: 12px/1.5 system-ui, sans-serif; }
-
-.entry { display: grid; grid-template-columns: 8px 1fr; gap: 8px; margin-bottom: 10px; }
-.entry:last-child { margin-bottom: 0; }
-.entry .lvl { width: 6px; height: 6px; margin-top: 6px; border-radius: 50%; background: var(--danger); }
-.entry.warning .lvl { background: #fbbf24; }
-.entry .meta { display: block; color: var(--faint); font-size: 11px; }
-.entry .msg { overflow-wrap: anywhere; white-space: pre-wrap; }
-.entry .more { margin-top: 2px; color: var(--faint); overflow-wrap: anywhere; white-space: pre-wrap; }
-
-.debug-actions { display: flex; align-items: center; gap: 8px; }
-.debug-actions .primary { height: 32px; padding: 0 14px; font-size: 12.5px; }
-.debug-actions .quiet { height: 32px; background: #1f1f23; }
-.debug-actions .spacer { flex: 1; }
-
-a.support-button { border: 0; color: var(--link); display: inline-block; }
-a.support-button:hover { color: #ddd6fe; }
-
-#debug-status { margin: 0; min-height: 17px; }
-
-.copy-confirmation {
-  background: #176b48 !important;
-  color: #fff !important;
-}
+.support-links button:hover:not(:disabled) { background: none; color: var(--text); }
 
 .beta {
   margin-left: 4px;

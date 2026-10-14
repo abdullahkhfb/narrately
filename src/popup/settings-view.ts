@@ -1,50 +1,50 @@
+/**
+ * @fileoverview Popup settings view controller.
+ */
+
 import {browser} from '../shared/browser';
+import {
+  getRequiredElement,
+  populateVoiceSelect,
+  syncSpeedChips,
+} from '../shared/dom';
 import {getSettings, setSettings} from '../shared/storage';
 import type {InferenceDevice} from '../shared/types';
-import {VOICE_CATALOG} from '../voices/catalog';
-import {getRequiredElement} from './dom';
 
-const DEVICE_HINTS: Record<InferenceDevice, string> = {
+const DEVICE_HINTS: Readonly<Record<InferenceDevice, string>> = {
   wasm: 'Works on every computer. Downloads an 88 MB voice model once.',
   webgpu: 'Faster on computers with a modern graphics card. Downloads a 312 MB voice model once.',
 };
 
 export async function initializeSettingsView(): Promise<void> {
-  const voice = getRequiredElement('voice', HTMLSelectElement);
-  const speed = getRequiredElement('speed', HTMLInputElement);
-  const cache = getRequiredElement('cache', HTMLInputElement);
-  const chips = getRequiredElement('speed-chips', HTMLElement);
-  const deviceHint = getRequiredElement('device-hint', HTMLElement);
-  const status = getRequiredElement('status', HTMLElement);
-  const saved = getRequiredElement('saved', HTMLElement);
-  const open = getRequiredElement('open', HTMLButtonElement);
+  const $ = <T extends Element>(id: string, type: {new (): T}): T =>
+    getRequiredElement(document, id, type);
+
+  const voice = $('voice', HTMLSelectElement);
+  const speed = $('speed', HTMLInputElement);
+  const cache = $('cache', HTMLInputElement);
+  const chips = $('speed-chips', HTMLElement);
+  const deviceHint = $('device-hint', HTMLElement);
+  const status = $('status', HTMLElement);
+  const saved = $('saved', HTMLElement);
+  const open = $('open', HTMLButtonElement);
   const deviceRadios = Array.from(
     document.querySelectorAll<HTMLInputElement>('input[name="device"]'),
   );
 
-  for (const item of VOICE_CATALOG) {
-    const option = document.createElement('option');
-    option.value = item.id;
-    option.textContent = `${item.name} · ${item.language}`;
-    option.title = item.description;
-    voice.appendChild(option);
-  }
+  populateVoiceSelect(voice);
 
   const selectedDevice = (): InferenceDevice =>
     getInferenceDevice(deviceRadios.find((radio) => radio.checked)?.value ?? 'wasm');
 
   const showSpeed = (): void => {
-    const value = Number(speed.value);
-    for (const chip of chips.querySelectorAll<HTMLButtonElement>('button')) {
-      chip.setAttribute('aria-pressed', String(Math.abs(Number(chip.dataset['speed']) - value) < 0.001));
-    }
+    syncSpeedChips(chips, Number(speed.value));
   };
   const showDevice = (): void => {
     deviceHint.textContent = DEVICE_HINTS[selectedDevice()];
   };
 
   let savedTimer: number | undefined;
-  /** Settings save as they change, so there is no Save button to forget. */
   const save = async (): Promise<void> => {
     try {
       await setSettings({

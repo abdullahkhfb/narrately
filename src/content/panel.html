@@ -1,0 +1,132 @@
+<button class="bubble" id="toggle" aria-label="Open Narrately" aria-expanded="false">
+  <span id="icon-bubble"></span>
+</button>
+<section class="panel" id="panel" role="dialog" aria-label="Narrately narrator" hidden>
+  <header class="head">
+    <span class="logo" id="icon-logo"></span>
+    <div class="titles">
+      <strong id="brand">Narrately</strong>
+      <span class="book" id="book-title"></span>
+    </div>
+    <button class="icon" id="open-storage" aria-label="Storage on this device" title="Storage">
+      <span id="icon-storage"></span>
+    </button>
+    <button class="icon" id="close" aria-label="Close">
+      <span id="icon-close"></span>
+    </button>
+  </header>
+  <div class="views">
+    <div class="body" id="view-listen">
+      <div class="field">
+        <span class="label" id="chapter-label">Chapter</span>
+        <div class="chapter-row">
+          <button class="icon" id="prev" aria-label="Previous chapter">
+            <span id="icon-prev"></span>
+          </button>
+          <select id="chapter" aria-label="Chapter"></select>
+          <button class="icon" id="next" aria-label="Next chapter">
+            <span id="icon-next"></span>
+          </button>
+        </div>
+      </div>
+      <div class="row">
+        <label class="field grow">
+          <span class="label">Voice</span>
+          <select id="voice"></select>
+        </label>
+        <div class="field">
+          <span class="label">Speed</span>
+          <input id="speed" type="hidden" value="1">
+          <div class="chips" id="speed-chips" role="group" aria-label="Speed">
+            <button type="button" data-speed="1" aria-pressed="false">1×</button>
+            <button type="button" data-speed="1.25" aria-pressed="false">1.25×</button>
+            <button type="button" data-speed="1.5" aria-pressed="false">1.5×</button>
+          </div>
+        </div>
+      </div>
+      <div class="text-row">
+        <span id="count"></span>
+        <button class="link" id="text-toggle" type="button">Preview text</button>
+      </div>
+      <div class="model" id="model" hidden>
+        <strong>Download the voice first</strong>
+        <span id="model-blurb"></span>
+        <button class="primary" id="model-download">
+          <span class="fill" id="model-fill"></span>
+          <span class="label-text" id="model-label">Download model</span>
+        </button>
+        <p class="status" id="model-status" role="status" aria-live="polite"></p>
+      </div>
+      <div class="player" id="player" hidden>
+        <input id="seek" type="range" min="0" max="1000" value="0" aria-label="Seek">
+        <div class="times">
+          <span id="cur">0:00</span>
+          <span id="dur">0:00</span>
+        </div>
+        <div class="controls">
+          <button class="icon" id="back" aria-label="Back 15 seconds">
+            <span id="icon-rewind"></span>
+          </button>
+          <button class="icon round" id="play" aria-label="Play"></button>
+          <button class="icon" id="forward" aria-label="Forward 15 seconds">
+            <span id="icon-forward"></span>
+          </button>
+          <button class="icon" id="download" aria-label="Download WAV">
+            <span id="icon-download"></span>
+          </button>
+        </div>
+      </div>
+      <div class="spacer"></div>
+      <button class="primary" id="generate" disabled>
+        <span class="fill" id="fill"></span>
+        <span class="label-text" id="generate-label">Narrate this chapter</span>
+      </button>
+      <p class="status" id="status" role="status" aria-live="polite">Runs entirely on your device.</p>
+    </div>
+    <div class="body" id="text-sheet" hidden>
+      <div class="sheet-head">
+        <strong>Chapter text</strong>
+        <button class="link" id="text-done" type="button">Done</button>
+      </div>
+      <textarea id="text" spellcheck="false" aria-label="Chapter text"></textarea>
+      <p class="status">Edit the text to change what is read aloud.</p>
+    </div>
+    <div class="body" id="view-storage" hidden>
+      <div class="sheet-head">
+        <strong>Stored on this device</strong>
+      </div>
+      <div class="storage-card">
+        <div class="storage-head">
+          <span>Total</span>
+          <strong id="storage-total">…</strong>
+        </div>
+        <div class="meter" id="meter" role="img" aria-label="Storage in use">
+          <span id="meter-chapters" class="seg kind-chapters"></span>
+          <span id="meter-model" class="seg kind-model"></span>
+        </div>
+        <ul class="storage-rows">
+          <li>
+            <span class="dot kind-chapters" aria-hidden="true"></span>
+            <div class="row-text">
+              <b>Narrated chapters</b>
+              <small id="chapters-meta">Checking…</small>
+            </div>
+            <button class="clear" id="clear-chapters" type="button" disabled>Clear</button>
+          </li>
+          <li>
+            <span class="dot kind-model" aria-hidden="true"></span>
+            <div class="row-text">
+              <b>Voice model</b>
+              <small id="model-meta">Checking…</small>
+            </div>
+            <button class="clear" id="clear-model" type="button" disabled>Delete</button>
+          </li>
+        </ul>
+      </div>
+      <button class="clear clear-all" id="clear-all" type="button" disabled>Clear everything</button>
+      <p class="status ok" id="storage-status" role="status" aria-live="polite"></p>
+      <div class="spacer"></div>
+      <button class="primary quiet" id="storage-back" type="button">Back to narration</button>
+    </div>
+  </div>
+</section>

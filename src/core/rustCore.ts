@@ -10,19 +10,33 @@ import init, {
 } from '../wasm/pkg/narrately_core.js';
 import {extensionUrl} from '../shared/extensionUrl';
 
-/** The WASM binary ships as a plain extension file at a known path. */
 const WASM_URL = extensionUrl('src/wasm/pkg/narrately_core_bg.wasm');
 
+let isReady = false;
 let ready: Promise<unknown> | undefined;
 
 async function ensureReady(): Promise<void> {
-  ready ??= init({module_or_path: WASM_URL});
+  if (isReady) {
+    return;
+  }
+  ready ??= init({module_or_path: WASM_URL}).then(
+    (output) => {
+      isReady = true;
+      return output;
+    },
+    (error: unknown) => {
+      ready = undefined;
+      throw error;
+    },
+  );
   await ready;
 }
 
 /** Splits narration text using the Rust chunker. */
 export async function splitText(text: string, maxChars = 480): Promise<string[]> {
-  await ensureReady();
+  if (!isReady) {
+    await ensureReady();
+  }
   const parsed: unknown = JSON.parse(chunkText(text, maxChars));
   if (!isStringArray(parsed)) {
     throw new Error('Rust chunker returned invalid data.');
@@ -36,7 +50,9 @@ export async function validateRequest(
   voiceId: string,
   speed: number,
 ): Promise<void> {
-  await ensureReady();
+  if (!isReady) {
+    await ensureReady();
+  }
   const result = validateSynthesisRequest(text, voiceId, speed);
   if (result) {
     throw new Error(result);
@@ -49,13 +65,33 @@ export async function cacheKey(
   voiceId: string,
   speed: number,
 ): Promise<string> {
-  await ensureReady();
+  if (!isReady) {
+    await ensureReady();
+  }
   return buildCacheKey(text, voiceId, speed);
+}
+
+/** Builds stable cache keys for a batch of chunks in a single synchronous pass. */
+export async function cacheKeys(
+  chunks: readonly string[],
+  voiceId: string,
+  speed: number,
+): Promise<string[]> {
+  if (!isReady) {
+    await ensureReady();
+  }
+  const keys = new Array<string>(chunks.length);
+  for (let i = 0; i < chunks.length; i += 1) {
+    keys[i] = buildCacheKey(chunks[i] as string, voiceId, speed);
+  }
+  return keys;
 }
 
 /** Returns the voice catalog exposed by the Rust core. */
 export async function voiceCatalog(): Promise<unknown[]> {
-  await ensureReady();
+  if (!isReady) {
+    await ensureReady();
+  }
   const parsed: unknown = JSON.parse(defaultVoiceCatalog());
   if (!Array.isArray(parsed)) {
     throw new Error('Rust voice catalog returned invalid data.');
@@ -64,5 +100,13 @@ export async function voiceCatalog(): Promise<unknown[]> {
 }
 
 function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === 'string');
+  if (!Array.isArray(value)) {
+    return false;
+  }
+  for (let i = 0; i < value.length; i += 1) {
+    if (typeof value[i] !== 'string') {
+      return false;
+    }
+  }
+  return true;
 }

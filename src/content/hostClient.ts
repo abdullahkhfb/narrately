@@ -30,17 +30,13 @@ export interface HostClient {
     request: NarrationRequest,
     onProgress: (progress: ProgressMessage) => void,
   ): NarrationJob;
-  /** Resolves true when the voice model is available on this device. */
   modelInstalled(device: Device): Promise<boolean>;
   downloadModel(
     device: Device,
     onProgress: (progress: ProgressMessage) => void,
   ): Job<void>;
-  /** Starts loading the model so the first narration begins sooner. */
   warmup(device: Device): void;
-  /** Reads how much space cached chapters and the model take. */
   storageInfo(): Promise<StorageInfo>;
-  /** Deletes cached chapters and/or the model; resolves with the new usage. */
   clearStorage(target: ClearTarget): Promise<StorageInfo>;
 }
 
@@ -52,39 +48,46 @@ interface Listener {
   onProgress: (progress: ProgressMessage) => void;
 }
 
-/** Embeds the extension-origin host page and returns a job API for it. */
+/** Creates a lazy job client that mounts the extension-origin host iframe on first use. */
 export function createHostClient(): HostClient {
-  const frame = document.createElement('iframe');
-  frame.src = extensionUrl('src/inference/host.html');
-  frame.setAttribute('aria-hidden', 'true');
-  frame.tabIndex = -1;
-  frame.dataset['narrately'] = 'host';
-  frame.style.cssText = 'display:none!important';
+  let frame: HTMLIFrameElement | undefined;
   let loaded = false;
-  frame.addEventListener('load', () => {
-    loaded = true;
-  }, {once: true});
-  document.documentElement.appendChild(frame);
-
   const listeners = new Map<string, Listener>();
 
+  const ensureFrame = (): HTMLIFrameElement => {
+    if (frame) {
+      return frame;
+    }
+    const created = document.createElement('iframe');
+    created.src = extensionUrl('src/inference/host.html');
+    created.setAttribute('aria-hidden', 'true');
+    created.tabIndex = -1;
+    created.dataset['narrately'] = 'host';
+    created.style.cssText = 'display:none!important';
+    created.addEventListener(
+      'load',
+      () => {
+        loaded = true;
+      },
+      {once: true},
+    );
+    document.documentElement.appendChild(created);
+    frame = created;
+    return created;
+  };
+
   window.addEventListener('message', (event: MessageEvent<WorkerMessage>) => {
-    if (event.source !== frame.contentWindow) {
+    if (!frame || event.source !== frame.contentWindow) {
       return;
     }
     const message: unknown = event.data;
     if (isHostDebugErrorMessage(message)) {
       void browser.runtime
         .sendMessage({type: 'report_debug_error', error: message.error})
-        .catch(() => {
-          // A reloaded extension invalidates the page's content-script context.
-        });
+        .catch(() => {});
       return;
     }
-    if (!isWorkerMessage(message)) {
-      return;
-    }
-    if (!('jobId' in message) || !message.jobId) {
+    if (!isWorkerMessage(message) || !('jobId' in message) || !message.jobId) {
       return;
     }
     const listener = listeners.get(message.jobId);
@@ -98,35 +101,40 @@ export function createHostClient(): HostClient {
     listeners.delete(message.jobId);
     if (message.type === 'error') {
       listener.reject(new Error(message.message));
-    } else if (message.type === 'result' || message.type === 'model_status' || message.type === 'storage_info') {
+    } else if (
+      message.type === 'result' ||
+      message.type === 'model_status' ||
+      message.type === 'storage_info'
+    ) {
       listener.settle(message);
     }
   });
 
-  /** Sends one request and settles with the host's final reply. */
+  function postToHost(payload: Record<string, unknown>): void {
+    const targetFrame = ensureFrame();
+    const send = (): void => {
+      targetFrame.contentWindow?.postMessage(payload, '*');
+    };
+    if (loaded) {
+      send();
+    } else {
+      targetFrame.addEventListener('load', send, {once: true});
+    }
+  }
+
   function call(
     body: Record<string, unknown>,
     onProgress: (progress: ProgressMessage) => void = () => {},
   ): Job<Reply> {
     const jobId = randomJobId();
-    const promise = new Promise<Reply>(
-      (settle, reject) => {
-        listeners.set(jobId, {settle, reject, onProgress});
-        const post = (): void => {
-          frame.contentWindow?.postMessage({...body, jobId}, '*');
-        };
-        // The frame is cross-origin, so its readiness is tracked via load.
-        if (loaded) {
-          post();
-        } else {
-          frame.addEventListener('load', post, {once: true});
-        }
-      },
-    );
+    const promise = new Promise<Reply>((settle, reject) => {
+      listeners.set(jobId, {settle, reject, onProgress});
+      postToHost({...body, jobId});
+    });
     return {
       promise,
       cancel() {
-        frame.contentWindow?.postMessage({type: 'cancel', jobId}, '*');
+        frame?.contentWindow?.postMessage({type: 'cancel', jobId}, '*');
       },
     };
   }
@@ -155,14 +163,7 @@ export function createHostClient(): HostClient {
       return toStorageInfo(await call({type: 'clear_storage', target}).promise);
     },
     warmup(device) {
-      const post = (): void => {
-        frame.contentWindow?.postMessage({type: 'warmup', device}, '*');
-      };
-      if (loaded) {
-        post();
-      } else {
-        frame.addEventListener('load', post, {once: true});
-      }
+      postToHost({type: 'warmup', device});
     },
     downloadModel(device, onProgress) {
       const job = call({type: 'model_download', device}, onProgress);
@@ -247,6 +248,5 @@ function randomJobId(): string {
   if (typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
   }
-  // Plain-http pages expose a restricted crypto surface.
   return `job-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }

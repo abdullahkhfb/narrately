@@ -1,22 +1,11 @@
 /**
  * @fileoverview Bundles the extension into `dist/`.
- *
- * Manifest-declared content scripts and background scripts are CLASSIC
- * scripts, so their bundles must be fully self-contained: no import or
- * export statements, and no import.meta expressions. Each of them is
- * therefore built alone in IIFE format with all dynamic imports inlined.
- *
- * The popup, the inference host page, and the module inference worker run
- * in module-capable extension contexts, so they share one ES-module build.
- *
- * The final pass copies static assets (manifest, icons, models, WASM
- * package, ONNX Runtime binaries) into dist.
  */
 
-import {build} from 'vite';
 import {cp, readFile, writeFile} from 'node:fs/promises';
-import {manifestFor} from './manifest.mjs';
 import {resolve} from 'node:path';
+import {build} from 'vite';
+import {manifestFor} from './manifest.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const OUT_DIR = 'dist';
@@ -54,6 +43,7 @@ async function buildModuleContexts() {
       outDir: OUT_DIR,
       emptyOutDir: false,
       sourcemap: true,
+      chunkSizeWarningLimit: 5000,
       rollupOptions: {
         input: {
           inference_worker: resolve(ROOT, 'src/inference/worker.ts'),
@@ -68,26 +58,33 @@ async function buildModuleContexts() {
         },
       },
     },
-    plugins: [copy_extension_assets()],
+    plugins: [copyExtensionAssets()],
   });
 }
 
-function copy_extension_assets() {
+function copyExtensionAssets() {
   return {
     name: 'copy-extension-assets',
     async closeBundle() {
-      // dist/ is the Chrome build; package-extension derives the others.
       const base = JSON.parse(await readFile(resolve(ROOT, 'manifest.json'), 'utf8'));
       const {version} = JSON.parse(await readFile(resolve(ROOT, 'package.json'), 'utf8'));
       await writeFile(
         resolve(ROOT, 'dist/manifest.json'),
         JSON.stringify(manifestFor(base, 'chrome', version), null, 2),
       );
-      await cp(resolve(ROOT, 'src/icons'), resolve(ROOT, 'dist/src/icons'), {recursive: true});
-      await cp(resolve(ROOT, 'models'), resolve(ROOT, 'dist/models'), {recursive: true});
-      await cp(resolve(ROOT, 'src/wasm/pkg'), resolve(ROOT, 'dist/src/wasm/pkg'), {
+      await cp(
+        resolve(ROOT, 'src/icons/toolbar'),
+        resolve(ROOT, 'dist/src/icons/toolbar'),
+        {recursive: true},
+      );
+      await cp(resolve(ROOT, 'models'), resolve(ROOT, 'dist/models'), {
         recursive: true,
       });
+      await cp(
+        resolve(ROOT, 'src/wasm/pkg'),
+        resolve(ROOT, 'dist/src/wasm/pkg'),
+        {recursive: true},
+      );
     },
   };
 }

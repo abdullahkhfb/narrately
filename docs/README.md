@@ -8,13 +8,13 @@ want to use it, read the [main README](../README.md).
 | Document | What it covers |
 | --- | --- |
 | [Getting started](getting-started.md) | Prerequisites, first build, loading the extension in a browser |
-| [Architecture](architecture.md) | Runtime contexts, message flow, data model, storage |
+| [Architecture](architecture.md) | Runtime contexts, message flow, UI asset separation, data model, storage |
 | [Building and packaging](building.md) | npm scripts, the three-pass bundler, `dist/` layout, per-browser manifests |
 | [Testing](testing.md) | Automated checks, the offline smoke test, the manual browser checklist |
 | [Releasing](releasing.md) | Version scheme, the release workflows, cutting a release |
 | [Model and voices](model-and-voices.md) | How the Kokoro model and voice packs are stored and loaded |
 | [Adding a supported site](adding-a-site.md) | The site adapter system and a step-by-step guide for new sites |
-| [Rust core](rust-core.md) | The WebAssembly domain crate and its API |
+| [Rust core](rust-core.md) | The WebAssembly domain crate, zero-copy chunking, and its API |
 | [Design notes](design-notes.md) | Why the code is shaped the way it is (read before "simplifying" things) |
 | [Troubleshooting](troubleshooting.md) | Build and runtime problems with known fixes |
 | [TypeScript style](TYPESCRIPT_STYLE.md) | Style rules for handwritten TypeScript |
@@ -41,7 +41,7 @@ without touching the panel or the narration pipeline. See
 - No server-side chapter text processing.
 - Curated narration voices bundled as local voice profiles.
 - Chrome and Firefox from one codebase.
-- Small, testable modules instead of one large content script.
+- Small, testable modules with each UI asset (HTML, CSS, SVG) in its own dedicated file.
 - **Rust** owns deterministic text planning, validation, cache keys and voice-pack metadata.
 - **TypeScript** owns browser APIs, DOM work, model workers and playback.
 
@@ -66,9 +66,10 @@ flowchart LR
     content --> sites["content/sites<br/>one adapter per supported site"]
     src --> core["core<br/>narration pipeline, Rust bridge"]
     src --> inference["inference<br/>host page, worker, Kokoro, model store"]
-    src --> popup["popup<br/>settings UI"]
-    src --> shared["shared<br/>types, messages, storage"]
+    src --> popup["popup<br/>settings and debug UIs"]
+    src --> shared["shared<br/>DOM/SVG/storage UI helpers, types, messages"]
     src --> voices["voices<br/>catalog"]
+    src --> icons["icons<br/>toolbar PNGs + dedicated UI SVGs"]
     src --> wasm["wasm/pkg<br/>generated Rust output"]
 ```
 
@@ -78,17 +79,26 @@ flowchart LR
 │                                voices.rs, voice_packs.rs
 ├── models/                      README.md + onnx-community/Kokoro-82M-ONNX/ (generated)
 ├── scripts/                     build-ts.mjs, manifest.mjs, package-extension.mjs,
-│                                zip-release.mjs, sync-model.mjs, smoke-model.mjs
+│                                zip-release.mjs, sync-model.mjs, smoke-model.mjs,
+│                                clean-wasm-pkg.mjs
 ├── src/
 │   ├── background/index.ts
-│   ├── content/                 index.ts, hostClient.ts, panel.ts, panel.css
-│   │   └── sites/               index.ts (registry), types.ts, text.ts, lnori.ts, generic.ts
+│   ├── content/                 index.ts, hostClient.ts, panel.ts, panel.html, panel.css
+│   │   └── sites/               index.ts (registry), types.ts, text.ts,
+│   │                            lnori.ts, cyrisia.ts, novelarchive.ts, generic.ts
 │   ├── core/                    narration.ts, rustCore.ts
 │   ├── inference/               host.html, host.ts, worker.ts, kokoro.ts, modelStore.ts, audio.ts
-│   ├── popup/                   index.html, index.ts, popup.css
-│   ├── shared/                  browser.ts, extensionUrl.ts, messages.ts, storage.ts, types.ts
+│   ├── popup/                   index.html, index.ts, settings-view.ts, storage-view.ts,
+│   │                            popup.css, debug.html, debug.ts, debug.css
+│   ├── shared/                  browser.ts, debugErrors.ts, dom.ts, extensionUrl.ts,
+│   │                            messages.ts, storage.ts, storageManager.ts,
+│   │                            storageView.ts, types.ts
 │   ├── voices/catalog.ts
 │   ├── icons/
+│   │   ├── toolbar/             icon16.png, icon48.png, icon128.png
+│   │   └── ui/                  bubble.svg, close.svg, download.svg, forward15.svg,
+│   │                            logo.svg, next.svg, pause.svg, play.svg, prev.svg,
+│   │                            rewind15.svg, storage.svg
 │   └── wasm/pkg/                generated Rust/WASM output
 ├── docs/assets/sites/           site logos used by the README
 ├── .github/

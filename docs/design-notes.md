@@ -1,15 +1,20 @@
 # Design notes
 
 Why the code looks the way it does. Most of these decisions exist because a
-browser restriction made the obvious approach fail. Read the relevant note before
-"simplifying" something.
+browser restriction made the obvious approach fail, or to keep memory footprint
+minimal across tabs. Read the relevant note before "simplifying" something.
 
 ## Decisions and the problems behind them
 
 | Decision | Problem it solves |
 | --- | --- |
 | Content and background scripts are built as **self-contained IIFE** bundles (`scripts/build-ts.mjs`) | Manifest content scripts are classic scripts. ES-module output with shared chunks throws `SyntaxError` the moment the browser injects `content.js` |
-| A hidden **extension-origin iframe** (`host.html` + `host.ts`) owns the inference worker, the Rust core and the audio cache | Content scripts run with the page's origin and cannot construct `new Worker(chrome-extension://…)` (`SecurityError`); an IndexedDB cache in the page origin would also not be shared across sites. Audio `ArrayBuffer`s are transferred back zero-copy |
+| Dedicated UI asset per view and icon (`panel.html`, `panel.css`, `popup/index.html`, `popup/popup.css`, `popup/debug.html`, `popup/debug.css`, `src/icons/ui/*.svg`) | Keeps markup, styles, and vector assets decoupled from TypeScript controller logic; eliminates inline HTML/SVG blobs and prevents the popup from parsing debug-only CSS |
+| Shared DOM, SVG cache, and storage controllers (`src/shared/dom.ts`, `src/shared/storageView.ts`) | Parses each bundled SVG asset at most once per context (cloning cached `SVGSVGElement` prototypes on reuse) and shares storage meter/clear logic between the popup and in-page panel |
+| A hidden **extension-origin iframe** (`host.html` + `host.ts`) owns the inference worker, the Rust core and the audio cache, and is **lazily mounted** on first use | Content scripts run with the page's origin and cannot construct `new Worker(chrome-extension://…)` (`SecurityError`); an IndexedDB cache in the page origin would also not be shared across sites. Deferring iframe creation until the panel is opened keeps idle tabs free of iframe overhead |
+| **Lazy inference worker** in `host.ts` | Checking model installation, reading storage usage, or downloading model files does not need the heavy ONNX/Kokoro worker; `host.ts` spawns `inference_worker.js` only when `warmup` or `synthesize` is requested |
+| Release raw `ArrayBuffer` reference in `panel.ts` and stream chunk array in `modelStore.ts` | Creating an object URL (`URL.createObjectURL(new Blob([audio]))`) already retains the backing audio data; dropping the raw `ArrayBuffer` reference in `panel.ts` and clearing `parts.length = 0` before SHA-256 verification in `modelStore.ts` prevents multi-hundred-megabyte memory spikes |
+| Zero-copy `Cow<'_, str>` chunking in Rust (`chunker.rs`) and upfront chunk deduplication in `narration.ts` | Contiguous paragraphs, sentences, and words borrow slices directly from the input `&str` without heap allocations; identical chunks are grouped before WASM SHA-256 hashing and IndexedDB reads, using a single `IDBDatabase` connection per chapter |
 | Debug reports are stored locally and capped at 100 records | Browser extensions cannot read arbitrary DevTools output; Narrately captures its own uncaught errors and console warnings/errors in each extension context |
 | Inference runs in a separate worker, not the background | Model loading and long generation are not tied to the MV3 background event lifetime |
 | **Neutral manifest, per-browser derivation** (`scripts/manifest.mjs`) | Chrome rejects `background.scripts` in MV3; Firefox does not run `background.service_worker` |
@@ -57,7 +62,6 @@ browser restriction made the obvious approach fail. Read the relevant note befor
   not tested against real sites.
   To officially support another site, add a dedicated adapter under
   `src/content/sites/`; see [Adding a supported site](adding-a-site.md).
-
 - Inside a web page the extension frame cannot be cross-origin isolated, so the
   WASM engine runs on one CPU thread.
 - Cancellation granularity is one chunk.

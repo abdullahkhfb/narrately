@@ -1,28 +1,47 @@
 /**
- * @fileoverview In-page Narrately controls, rendered inside a Shadow DOM so
- * the host page's styles cannot leak in and ours cannot leak out.
+ * @fileoverview In-page Narrately controls, rendered inside a Shadow DOM.
  */
 
 import {browser} from '../shared/browser';
+import {
+  getRequiredElement,
+  parseSvg,
+  populateVoiceSelect,
+  syncSpeedChips,
+} from '../shared/dom';
 import {getSettings, setSettings} from '../shared/storage';
-import {VOICE_CATALOG} from '../voices/catalog';
+import {createStorageController} from '../shared/storageView';
 import type {Book} from '../shared/types';
-import {detectBook} from './sites';
 import {createHostClient, type Job, type NarrationJob} from './hostClient';
-import {formatBytes, type ClearTarget, type StorageInfo} from '../shared/storageManager';
-import {parseSvg} from '../shared/svg';
 import panelCss from './panel.css?inline';
+import panelHtml from './panel.html?raw';
+import {detectBook} from './sites';
 import bubbleIcon from '../icons/ui/bubble.svg?raw';
 import closeIcon from '../icons/ui/close.svg?raw';
 import downloadIcon from '../icons/ui/download.svg?raw';
 import forwardIcon from '../icons/ui/forward15.svg?raw';
 import logoIcon from '../icons/ui/logo.svg?raw';
+import nextIcon from '../icons/ui/next.svg?raw';
 import pauseIcon from '../icons/ui/pause.svg?raw';
 import playIcon from '../icons/ui/play.svg?raw';
+import prevIcon from '../icons/ui/prev.svg?raw';
 import rewindIcon from '../icons/ui/rewind15.svg?raw';
 import storageIcon from '../icons/ui/storage.svg?raw';
 
 const SKIP_SECONDS = 15;
+const PANEL_ICONS = [
+  ['icon-bubble', bubbleIcon],
+  ['icon-logo', logoIcon],
+  ['icon-storage', storageIcon],
+  ['icon-close', closeIcon],
+  ['icon-prev', prevIcon],
+  ['icon-next', nextIcon],
+  ['icon-rewind', rewindIcon],
+  ['icon-forward', forwardIcon],
+  ['icon-download', downloadIcon],
+  ['play', playIcon],
+] as const;
+
 let shadow: ShadowRoot | undefined;
 let openHook: (() => void) | undefined;
 
@@ -41,10 +60,9 @@ export function mountPanel(): boolean {
   shadow = host.attachShadow({mode: 'open'});
   const style = document.createElement('style');
   style.textContent = panelCss;
-  shadow.append(style);
   const root = document.createElement('div');
   root.append(renderPanel(book));
-  shadow.append(root);
+  shadow.append(style, root);
   document.documentElement.appendChild(host);
 
   void wirePanel(root, book);
@@ -61,136 +79,33 @@ export function openPanel(): boolean {
 }
 
 function renderPanel(book: Book): DocumentFragment {
-  const parsed = new DOMParser().parseFromString(`
-    <button class="bubble" id="toggle" aria-label="Open Narrately" aria-expanded="false"><span id="icon-bubble"></span></button>
-    <section class="panel" id="panel" role="dialog" aria-label="Narrately narrator" hidden>
-      <header class="head">
-        <span class="logo" id="icon-logo"></span>
-        <div class="titles">
-          <strong id="brand">Narrately</strong>
-          <span class="book" id="book-title"></span>
-        </div>
-        <button class="icon" id="open-storage" aria-label="Storage on this device" title="Storage"><span id="icon-storage"></span></button>
-        <button class="icon" id="close" aria-label="Close"><span id="icon-close"></span></button>
-      </header>
-      <div class="views">
-        <div class="body" id="view-listen">
-          <div class="field">
-            <span class="label" id="chapter-label">Chapter</span>
-            <div class="chapter-row">
-              <button class="icon" id="prev" aria-label="Previous chapter">‹</button>
-              <select id="chapter" aria-label="Chapter"></select>
-              <button class="icon" id="next" aria-label="Next chapter">›</button>
-            </div>
-          </div>
-          <div class="row">
-            <label class="field grow"><span class="label">Voice</span><select id="voice"></select></label>
-            <div class="field">
-              <span class="label">Speed</span>
-              <input id="speed" type="hidden" value="1">
-              <div class="chips" id="speed-chips" role="group" aria-label="Speed">
-                <button type="button" data-speed="1" aria-pressed="false">1×</button>
-                <button type="button" data-speed="1.25" aria-pressed="false">1.25×</button>
-                <button type="button" data-speed="1.5" aria-pressed="false">1.5×</button>
-              </div>
-            </div>
-          </div>
-          <div class="text-row">
-            <span id="count"></span>
-            <button class="link" id="text-toggle" type="button">Preview text</button>
-          </div>
-          <div class="model" id="model" hidden>
-            <strong>Download the voice first</strong>
-            <span id="model-blurb"></span>
-            <button class="primary" id="model-download"><span class="fill" id="model-fill"></span><span class="label-text" id="model-label">Download model</span></button>
-            <p class="status" id="model-status" role="status" aria-live="polite"></p>
-          </div>
-          <div class="player" id="player" hidden>
-            <input id="seek" type="range" min="0" max="1000" value="0" aria-label="Seek">
-            <div class="times"><span id="cur">0:00</span><span id="dur">0:00</span></div>
-            <div class="controls">
-              <button class="icon" id="back" aria-label="Back 15 seconds"><span id="icon-rewind"></span></button>
-              <button class="icon round" id="play" aria-label="Play"></button>
-              <button class="icon" id="forward" aria-label="Forward 15 seconds"><span id="icon-forward"></span></button>
-              <button class="icon" id="download" aria-label="Download WAV"><span id="icon-download"></span></button>
-            </div>
-          </div>
-          <div class="spacer"></div>
-          <button class="primary" id="generate" disabled><span class="fill" id="fill"></span><span class="label-text" id="generate-label">Narrate this chapter</span></button>
-          <p class="status" id="status" role="status" aria-live="polite">Runs entirely on your device.</p>
-        </div>
-        <div class="body" id="text-sheet" hidden>
-          <div class="sheet-head">
-            <strong>Chapter text</strong>
-            <button class="link" id="text-done" type="button">Done</button>
-          </div>
-          <textarea id="text" spellcheck="false" aria-label="Chapter text"></textarea>
-          <p class="status">Edit the text to change what is read aloud.</p>
-        </div>
-        <div class="body" id="view-storage" hidden>
-          <div class="sheet-head"><strong>Stored on this device</strong></div>
-          <div class="storage-card">
-            <div class="storage-head"><span>Total</span><strong id="storage-total">…</strong></div>
-            <div class="meter" id="meter" role="img" aria-label="Storage in use">
-              <span id="meter-chapters" class="seg kind-chapters"></span>
-              <span id="meter-model" class="seg kind-model"></span>
-            </div>
-            <ul class="storage-rows">
-              <li>
-                <span class="dot kind-chapters" aria-hidden="true"></span>
-                <div class="row-text"><b>Narrated chapters</b><small id="chapters-meta">Checking…</small></div>
-                <button class="clear" id="clear-chapters" disabled>Clear</button>
-              </li>
-              <li>
-                <span class="dot kind-model" aria-hidden="true"></span>
-                <div class="row-text"><b>Voice model</b><small id="model-meta">Checking…</small></div>
-                <button class="clear" id="clear-model" disabled>Delete</button>
-              </li>
-            </ul>
-          </div>
-          <button class="clear clear-all" id="clear-all" disabled>Clear everything</button>
-          <p class="status ok" id="storage-status" role="status" aria-live="polite"></p>
-          <div class="spacer"></div>
-          <button class="primary quiet" id="storage-back" type="button">Back to narration</button>
-        </div>
-      </div>
-    </section>
-  `, 'text/html');
-  const fragment = document.createDocumentFragment();
-  for (const node of Array.from(parsed.body.childNodes)) {
-    fragment.append(document.importNode(node, true));
-  }
+  const template = document.createElement('template');
+  template.innerHTML = panelHtml;
+  const fragment = template.content;
 
-  const query = <T extends Element>(selector: string): T => {
-    const element = fragment.querySelector<T>(selector);
-    if (!element) {
-      throw new Error(`Panel template is missing ${selector}.`);
-    }
-    return element;
-  };
-  const bookTitle = query<HTMLElement>('#book-title');
+  const bookTitle = getRequiredElement(fragment, 'book-title', HTMLElement);
   bookTitle.textContent = book.title;
   bookTitle.title = book.title;
 
-  const chapter = query<HTMLSelectElement>('#chapter');
-  book.chapters.forEach((item, index) => {
+  const chapter = getRequiredElement(fragment, 'chapter', HTMLSelectElement);
+  const options = document.createDocumentFragment();
+  for (let i = 0; i < book.chapters.length; i += 1) {
+    const item = book.chapters[i];
+    if (!item) {
+      continue;
+    }
     const option = document.createElement('option');
-    option.value = String(index);
+    option.value = String(i);
     option.textContent = item.title;
-    chapter.append(option);
-  });
-  const multi = book.chapters.length > 1;
-  query<HTMLButtonElement>('#prev').disabled = !multi;
-  query<HTMLButtonElement>('#next').disabled = !multi;
-
-  const voice = query<HTMLSelectElement>('#voice');
-  for (const item of VOICE_CATALOG) {
-    const option = document.createElement('option');
-    option.value = item.id;
-    option.title = item.description;
-    option.textContent = `${item.name} · ${item.language}`;
-    voice.append(option);
+    options.append(option);
   }
+  chapter.append(options);
+
+  const multi = book.chapters.length > 1;
+  getRequiredElement(fragment, 'prev', HTMLButtonElement).disabled = !multi;
+  getRequiredElement(fragment, 'next', HTMLButtonElement).disabled = !multi;
+
+  populateVoiceSelect(getRequiredElement(fragment, 'voice', HTMLSelectElement));
 
   const versionName = browser.runtime.getManifest().version_name ?? '';
   if (versionName.includes('-')) {
@@ -198,21 +113,11 @@ function renderPanel(book: Book): DocumentFragment {
     badge.className = 'beta';
     badge.title = versionName;
     badge.textContent = 'Beta';
-    query('#brand').append(' ', badge);
+    getRequiredElement(fragment, 'brand', HTMLElement).append(' ', badge);
   }
 
-  const icons = [
-    ['#icon-bubble', bubbleIcon],
-    ['#icon-logo', logoIcon],
-    ['#icon-storage', storageIcon],
-    ['#icon-close', closeIcon],
-    ['#icon-rewind', rewindIcon],
-    ['#icon-forward', forwardIcon],
-    ['#icon-download', downloadIcon],
-    ['#play', playIcon],
-  ] as const;
-  for (const [selector, icon] of icons) {
-    query(selector).append(parseSvg(icon));
+  for (const [id, icon] of PANEL_ICONS) {
+    getRequiredElement(fragment, id, Element).append(parseSvg(icon));
   }
   return fragment;
 }
@@ -238,6 +143,7 @@ async function wirePanel(root: ParentNode, book: Book): Promise<void> {
   const chapterLabel = $('chapter-label', HTMLElement);
   const openStorage = $('open-storage', HTMLButtonElement);
   const storageBack = $('storage-back', HTMLButtonElement);
+  const storageStatus = $('storage-status', HTMLElement);
   const generate = $('generate', HTMLButtonElement);
   const generateLabel = $('generate-label', HTMLElement);
   const fill = $('fill', HTMLElement);
@@ -247,6 +153,8 @@ async function wirePanel(root: ParentNode, book: Book): Promise<void> {
   const cur = $('cur', HTMLElement);
   const dur = $('dur', HTMLElement);
   const play = $('play', HTMLButtonElement);
+  const viewListen = $('view-listen', HTMLElement);
+  const viewStorage = $('view-storage', HTMLElement);
   const modelCard = $('model', HTMLElement);
   const modelButton = $('model-download', HTMLButtonElement);
   const modelLabel = $('model-label', HTMLElement);
@@ -258,11 +166,11 @@ async function wirePanel(root: ParentNode, book: Book): Promise<void> {
   const audio = new Audio();
   let job: NarrationJob | undefined;
   let cancelled = false;
-  let latest: ArrayBuffer | undefined;
   let latestUrl: string | undefined;
   let generatedSpeed = 1;
   let startedAt = 0;
   let firstDoneAt = 0;
+  let warmedDevice: string | undefined;
 
   let settings: Awaited<ReturnType<typeof getSettings>>;
   let settingsUnavailable = false;
@@ -278,6 +186,7 @@ async function wirePanel(root: ParentNode, book: Book): Promise<void> {
     };
     settingsUnavailable = true;
   }
+
   voice.value = settings.voiceId;
   speed.value = String(settings.speed);
   if (settingsUnavailable) {
@@ -288,22 +197,46 @@ async function wirePanel(root: ParentNode, book: Book): Promise<void> {
     }
     modelButton.disabled = true;
   }
-  /** Playback ratio between the chosen speed and the speed the audio was made at. */
+
   const applyPlaybackRate = (): void => {
     const rate = Number(speed.value) / generatedSpeed;
-    // Both properties: assigning `src` resets `playbackRate` to the default.
     audio.defaultPlaybackRate = rate;
     audio.playbackRate = rate;
     audio.preservesPitch = true;
   };
+
   const showSpeed = (): void => {
-    const value = Number(speed.value);
-    for (const chip of speedChips.querySelectorAll<HTMLButtonElement>('button')) {
-      chip.setAttribute('aria-pressed', String(Math.abs(Number(chip.dataset['speed']) - value) < 0.001));
-    }
+    syncSpeedChips(speedChips, Number(speed.value));
     applyPlaybackRate();
   };
   showSpeed();
+
+  const storageController = createStorageController(root, {
+    read: () => host.storageInfo(),
+    clear: (target) => host.clearStorage(target),
+    onCleared: (target) => {
+      if (target !== 'chapters') {
+        warmedDevice = undefined;
+        void refreshModel();
+      }
+    },
+    onReadError: (error, statusElement) => {
+      statusElement.textContent = getErrorMessage(error);
+    },
+    onClearError: (error, statusElement) => {
+      statusElement.textContent = getErrorMessage(error);
+    },
+  });
+
+  const showView = (name: 'listen' | 'text' | 'storage'): void => {
+    viewListen.hidden = name !== 'listen';
+    textSheet.hidden = name !== 'text';
+    viewStorage.hidden = name !== 'storage';
+    if (name === 'storage') {
+      storageStatus.textContent = '';
+      void storageController.refresh();
+    }
+  };
 
   const setOpen = (open: boolean): void => {
     panel.hidden = !open;
@@ -326,11 +259,8 @@ async function wirePanel(root: ParentNode, book: Book): Promise<void> {
         toggle.focus();
       }
     }
-    // Keep page shortcuts (e.g. reader hotkeys) from firing while typing.
     event.stopPropagation();
   });
-  // Readers often page on keyup/keypress too, so the arrow keys that move a
-  // slider must not turn the page behind it.
   panel.addEventListener('keyup', (event) => event.stopPropagation());
   panel.addEventListener('keypress', (event) => event.stopPropagation());
 
@@ -339,9 +269,8 @@ async function wirePanel(root: ParentNode, book: Book): Promise<void> {
     audio.removeAttribute('src');
     if (latestUrl) {
       URL.revokeObjectURL(latestUrl);
+      latestUrl = undefined;
     }
-    latest = undefined;
-    latestUrl = undefined;
     player.hidden = true;
   };
 
@@ -350,16 +279,20 @@ async function wirePanel(root: ParentNode, book: Book): Promise<void> {
     text.value = book.chapters[index]?.text ?? '';
     count.textContent = describeText(text.value.length);
     chapterLabel.textContent =
-      book.chapters.length > 1 ? `Chapter ${index + 1} of ${book.chapters.length}` : 'Chapter';
+      book.chapters.length > 1
+        ? `Chapter ${index + 1} of ${book.chapters.length}`
+        : 'Chapter';
     prev.disabled = index <= 0;
     next.disabled = index >= book.chapters.length - 1;
   };
+
   const selectChapter = (index: number): void => {
     chapter.value = String(index);
     resetPlayer();
     syncChapter();
     status.textContent = 'Ready.';
   };
+
   chapter.addEventListener('change', () => selectChapter(Number(chapter.value)));
   prev.addEventListener('click', () => selectChapter(Number(chapter.value) - 1));
   next.addEventListener('click', () => selectChapter(Number(chapter.value) + 1));
@@ -375,6 +308,14 @@ async function wirePanel(root: ParentNode, book: Book): Promise<void> {
   textDone.addEventListener('click', () => {
     showView('listen');
     textToggle.focus();
+  });
+  openStorage.addEventListener('click', () => {
+    showView('storage');
+    storageBack.focus();
+  });
+  storageBack.addEventListener('click', () => {
+    showView('listen');
+    openStorage.focus();
   });
 
   const persist = (): void => {
@@ -397,109 +338,6 @@ async function wirePanel(root: ParentNode, book: Book): Promise<void> {
     persist();
   });
 
-  let warmedDevice: string | undefined;
-
-  // Views: Listen, text editor, Storage (all share the same fixed space).
-  const viewListen = $('view-listen', HTMLElement);
-  const viewStorage = $('view-storage', HTMLElement);
-  const storageTotal = $('storage-total', HTMLElement);
-  const meter = $('meter', HTMLElement);
-  const meterChapters = $('meter-chapters', HTMLElement);
-  const meterModel = $('meter-model', HTMLElement);
-  const chaptersMeta = $('chapters-meta', HTMLElement);
-  const modelMeta = $('model-meta', HTMLElement);
-  const storageStatus = $('storage-status', HTMLElement);
-  const clearButtons: Record<ClearTarget, HTMLButtonElement> = {
-    chapters: $('clear-chapters', HTMLButtonElement),
-    model: $('clear-model', HTMLButtonElement),
-    all: $('clear-all', HTMLButtonElement),
-  };
-  let storageBusy = false;
-  let storageLatest: StorageInfo | undefined;
-
-  const renderStorage = (info: StorageInfo): void => {
-    const sum = info.chapterBytes + info.modelBytes;
-    storageTotal.textContent = sum > 0 ? formatBytes(sum) : 'Empty';
-    meterChapters.style.flexGrow = String(info.chapterBytes);
-    meterModel.style.flexGrow = String(info.modelBytes);
-    meter.classList.toggle('empty', sum === 0);
-    meter.setAttribute(
-      'aria-label',
-      `Chapters ${formatBytes(info.chapterBytes)}, voice model ${formatBytes(info.modelBytes)}`,
-    );
-    chaptersMeta.textContent =
-      info.chapterEntries > 0
-        ? `${formatBytes(info.chapterBytes)} · replays instantly`
-        : 'Nothing saved yet';
-    modelMeta.textContent =
-      info.modelBytes > 0
-        ? `${formatBytes(info.modelBytes)} · needed to narrate`
-        : 'Not downloaded';
-    clearButtons.chapters.disabled = storageBusy || info.chapterEntries === 0;
-    clearButtons.model.disabled = storageBusy || info.modelBytes === 0;
-    clearButtons.all.disabled = storageBusy || sum === 0;
-  };
-
-  const refreshStorage = async (): Promise<void> => {
-    try {
-      storageLatest = await host.storageInfo();
-      renderStorage(storageLatest);
-    } catch (error: unknown) {
-      storageTotal.textContent = '—';
-      storageStatus.textContent = getErrorMessage(error);
-    }
-  };
-
-  const showView = (name: 'listen' | 'text' | 'storage'): void => {
-    viewListen.hidden = name !== 'listen';
-    textSheet.hidden = name !== 'text';
-    viewStorage.hidden = name !== 'storage';
-    if (name === 'storage') {
-      storageStatus.textContent = '';
-      void refreshStorage();
-    }
-  };
-  openStorage.addEventListener('click', () => {
-    showView('storage');
-    storageBack.focus();
-  });
-  storageBack.addEventListener('click', () => {
-    showView('listen');
-    openStorage.focus();
-  });
-
-  const clearStored = async (target: ClearTarget): Promise<void> => {
-    if (storageBusy || !storageLatest) {
-      return;
-    }
-    const before = storageLatest;
-    storageBusy = true;
-    renderStorage(before);
-    storageStatus.textContent = 'Clearing…';
-    try {
-      storageLatest = await host.clearStorage(target);
-      const freed =
-        (target !== 'model' ? before.chapterBytes - storageLatest.chapterBytes : 0) +
-        (target !== 'chapters' ? before.modelBytes - storageLatest.modelBytes : 0);
-      storageStatus.textContent = `Cleared. Freed ${formatBytes(Math.max(freed, 0))}.`;
-      if (target !== 'chapters') {
-        warmedDevice = undefined;
-        void refreshModel();
-      }
-    } catch (error: unknown) {
-      storageStatus.textContent = getErrorMessage(error);
-    } finally {
-      storageBusy = false;
-      if (storageLatest) {
-        renderStorage(storageLatest);
-      }
-    }
-  };
-  for (const [target, button] of Object.entries(clearButtons) as [ClearTarget, HTMLButtonElement][]) {
-    button.addEventListener('click', () => void clearStored(target));
-  }
-
-  // Voice model: gate Generate until the files are on this device.
   let download: Job<void> | undefined;
   let downloadCancelled = false;
 
@@ -508,8 +346,6 @@ async function wirePanel(root: ParentNode, book: Book): Promise<void> {
     generate.disabled = !ready;
   };
 
-  /** Re-checks the model for the current device (the popup may have changed
-   * it) and pre-loads it so the first narration starts sooner. */
   async function refreshModel(): Promise<void> {
     try {
       const {device} = await getSettings();
@@ -543,14 +379,17 @@ async function wirePanel(root: ParentNode, book: Book): Promise<void> {
     modelStatus.textContent = 'Starting…';
     try {
       const {device} = await getSettings();
-      download = host.downloadModel(device, ({completed, total, loadedBytes, totalBytes}) => {
-        const percent = (completed / Math.max(total, 1)) * 100;
-        modelFill.style.width = `${percent}%`;
-        modelLabel.textContent = `Downloading… ${Math.round(percent)}% (cancel)`;
-        if (totalBytes) {
-          modelStatus.textContent = `${formatMb(loadedBytes ?? 0)} of ${formatMb(totalBytes)}`;
-        }
-      });
+      download = host.downloadModel(
+        device,
+        ({completed, total, loadedBytes, totalBytes}) => {
+          const percent = (completed / Math.max(total, 1)) * 100;
+          modelFill.style.width = `${percent}%`;
+          modelLabel.textContent = `Downloading… ${Math.round(percent)}% (cancel)`;
+          if (totalBytes) {
+            modelStatus.textContent = `${formatMb(loadedBytes ?? 0)} of ${formatMb(totalBytes)}`;
+          }
+        },
+      );
       await download.promise;
       await refreshModel();
       status.textContent = 'Voice model ready.';
@@ -606,8 +445,6 @@ async function wirePanel(root: ParentNode, book: Book): Promise<void> {
           }
           const now = performance.now();
           firstDoneAt ||= now;
-          // Estimate from the pace after the first part, which also absorbs
-          // the one-time model load.
           const left =
             completed > 1
               ? (((now - firstDoneAt) / (completed - 1)) * (total - completed)) / 1000
@@ -619,7 +456,6 @@ async function wirePanel(root: ParentNode, book: Book): Promise<void> {
         },
       );
       const result = await job.promise;
-      latest = result.audio;
       latestUrl = URL.createObjectURL(new Blob([result.audio], {type: 'audio/wav'}));
       audio.src = latestUrl;
       applyPlaybackRate();
@@ -632,7 +468,7 @@ async function wirePanel(root: ParentNode, book: Book): Promise<void> {
         try {
           await audio.play();
         } catch {
-          // Autoplay can be blocked until the user interacts with the page.
+          // Autoplay may be blocked before user gesture.
         }
       }
     } catch (error: unknown) {
@@ -646,7 +482,6 @@ async function wirePanel(root: ParentNode, book: Book): Promise<void> {
     }
   });
 
-  // Player controls.
   const setIcon = (): void => {
     play.replaceChildren(parseSvg(audio.paused ? playIcon : pauseIcon));
     play.setAttribute('aria-label', audio.paused ? 'Play' : 'Pause');
@@ -684,11 +519,9 @@ async function wirePanel(root: ParentNode, book: Book): Promise<void> {
   });
 
   $('download', HTMLButtonElement).addEventListener('click', () => {
-    if (!latestUrl || !latest) {
+    if (!latestUrl) {
       return;
     }
-    // A plain anchor works in content scripts; no downloads permission or
-    // background round-trip (which would also mangle the ArrayBuffer).
     const link = document.createElement('a');
     link.href = latestUrl;
     link.download = `${sanitizeFilename(book.title)} - ${sanitizeFilename(
@@ -700,20 +533,6 @@ async function wirePanel(root: ParentNode, book: Book): Promise<void> {
   setIcon();
 }
 
-/** Looks up an element by id and verifies its type. */
-function getRequiredElement<T extends Element>(
-  parent: ParentNode,
-  id: string,
-  elementType: {new (): T},
-): T {
-  const element = parent.querySelector(`#${id}`);
-  if (!(element instanceof elementType)) {
-    throw new Error(`Missing panel element: #${id}`);
-  }
-  return element;
-}
-
-/** "5,420 characters · about 6 min" (narration runs near 900 characters a minute). */
 function describeText(length: number): string {
   return `${length.toLocaleString()} characters · about ${Math.max(1, Math.round(length / 900))} min`;
 }
