@@ -41,14 +41,14 @@ flowchart TB
     worker -->|"debug_error"| host
 ```
 
-| Context | Entry & UI Assets | Bundle format | Responsibilities |
-| --- | --- | --- | --- |
-| Content script | `src/content/index.ts`, `panel.ts`, `panel.html`, `panel.css` | IIFE (classic) | Detect chapters, render the Shadow DOM panel, drive playback, lazily embed the host iframe when the panel opens |
-| Host page | `src/inference/host.html`, `host.ts` | ES module | Own the Rust/WASM core, the audio cache, and the model store; lazily spawn the inference worker for warmup/synthesis |
-| Inference worker | `src/inference/worker.ts` | ES module worker | Load Kokoro, synthesize one chunk at a time, enforce the local-only fetch guard |
-| Background | `src/background/index.ts` | IIFE (classic) | Seed default settings on install; handle settings, panel, and debug-log messages; retain up to 100 local diagnostic records |
-| Popup | `src/popup/index.html`, `index.ts`, `popup.css` | ES module | Edit settings (reads and writes `storage.local` directly), manage storage, ask the active tab to open its panel |
-| Debug page | `src/popup/debug.html`, `debug.ts`, `debug.css` | ES module | Display captured Narrately warnings/errors as a colour-coded list in a fixed-size window, and copy or clear the report |
+| Context          | Entry & UI Assets                                             | Bundle format    | Responsibilities                                                                                                            |
+| ---------------- | ------------------------------------------------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Content script   | `src/content/index.ts`, `panel.ts`, `panel.html`, `panel.css` | IIFE (classic)   | Detect chapters, render the Shadow DOM panel, drive playback, lazily embed the host iframe when the panel opens             |
+| Host page        | `src/inference/host.html`, `host.ts`                          | ES module        | Own the Rust/WASM core, the audio cache, and the model store; lazily spawn the inference worker for warmup/synthesis        |
+| Inference worker | `src/inference/worker.ts`                                     | ES module worker | Load Kokoro, synthesize one chunk at a time, enforce the local-only fetch guard                                             |
+| Background       | `src/background/index.ts`                                     | IIFE (classic)   | Seed default settings on install; handle settings, panel, and debug-log messages; retain up to 100 local diagnostic records |
+| Popup            | `src/popup/index.html`, `index.ts`, `popup.css`               | ES module        | Edit settings (reads and writes `storage.local` directly), manage storage, ask the active tab to open its panel             |
+| Debug page       | `src/popup/debug.html`, `debug.ts`, `debug.css`               | ES module        | Display captured Narrately warnings/errors as a colour-coded list in a fixed-size window, and copy or clear the report      |
 
 The manifest declares both Chrome's and Firefox's background style in neutral
 form; [`scripts/manifest.mjs`](../scripts/manifest.mjs) emits only the key each
@@ -133,14 +133,14 @@ are required; see [Model and voices](model-and-voices.md).
 All message types are declared in [`src/shared/messages.ts`](../src/shared/messages.ts).
 Receivers validate `type` at runtime before narrowing.
 
-| Channel | Direction | Types |
-| --- | --- | --- |
-| `runtime.sendMessage` | popup/content/debug page to background | settings and panel messages; `report_debug_error`, `get_debug_errors`, `clear_debug_errors` |
-| `tabs.sendMessage` | popup to content | `open_panel` |
-| `postMessage` | content to host iframe | `narrate`, `cancel`, `model_status`, `model_download`, `warmup`, `storage_info`, `clear_storage` |
-| `postMessage` | host iframe to content | `progress`, `result`, `error`, `model_status`, `storage_info`, `narrately_debug_error` |
-| `Worker.postMessage` | host to worker | `synthesize`, `cancel`, `warmup` |
-| `Worker.postMessage` | worker to host | `progress`, `result`, `error`, `ready`, `debug_error` |
+| Channel               | Direction                              | Types                                                                                            |
+| --------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `runtime.sendMessage` | popup/content/debug page to background | settings and panel messages; `report_debug_error`, `get_debug_errors`, `clear_debug_errors`      |
+| `tabs.sendMessage`    | popup to content                       | `open_panel`                                                                                     |
+| `postMessage`         | content to host iframe                 | `narrate`, `cancel`, `model_status`, `model_download`, `warmup`, `storage_info`, `clear_storage` |
+| `postMessage`         | host iframe to content                 | `progress`, `result`, `error`, `model_status`, `storage_info`, `narrately_debug_error`           |
+| `Worker.postMessage`  | host to worker                         | `synthesize`, `cancel`, `warmup`                                                                 |
+| `Worker.postMessage`  | worker to host                         | `progress`, `result`, `error`, `ready`, `debug_error`                                            |
 
 Every request carries a `jobId`. The content-side `HostClient` keeps a
 `Map<jobId, listener>`; progress messages keep the listener, while `result`,
@@ -159,22 +159,22 @@ in `src/content/sites/`; `detectBook()` in `sites/index.ts` picks the first adap
 that recognizes the page and falls back to a generic one. The full guide for
 adding a site is in [Adding a supported site](adding-a-site.md).
 
-| Adapter | `Book.source` | Support level |
-| --- | --- | --- |
-| `lnori.ts` (`section.chapter` markup, host `lnori.com`) | `'lnori'` | **Official.** Multi-chapter books, real chapter titles, chapter navigation; untitled text selectors continue the prior chapter and image-only selectors are skipped |
-| `cyrisia.ts` (`main.ch-page` and `#ch-text`, host `cyrisia.com`) | `'cyrisia'` | **Official.** Reads the chapter title and story from the live reader, with iframe fallback; sequential selectors for named chapter parts are joined |
-| `novelarchive.ts` (`#reader-article`, host `novelarchive.cc`) | `'novelarchive'` | **Official.** One chapter per reader URL, with novel and chapter titles |
-| `generic.ts` (scored article or main element) | `'generic'` | **Best effort.** One synthetic chapter named after the first heading; no chapter list; may pick the wrong block on unfamiliar layouts |
+| Adapter                                                          | `Book.source`    | Support level                                                                                                                                                       |
+| ---------------------------------------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lnori.ts` (`section.chapter` markup, host `lnori.com`)          | `'lnori'`        | **Official.** Multi-chapter books, real chapter titles, chapter navigation; untitled text selectors continue the prior chapter and image-only selectors are skipped |
+| `cyrisia.ts` (`main.ch-page` and `#ch-text`, host `cyrisia.com`) | `'cyrisia'`      | **Official.** Reads the chapter title and story from the live reader, with iframe fallback; sequential selectors for named chapter parts are joined                 |
+| `novelarchive.ts` (`#reader-article`, host `novelarchive.cc`)    | `'novelarchive'` | **Official.** One chapter per reader URL, with novel and chapter titles                                                                                             |
+| `generic.ts` (scored article or main element)                    | `'generic'`      | **Best effort.** One synthetic chapter named after the first heading; no chapter list; may pick the wrong block on unfamiliar layouts                               |
 
 If nothing is found at load, `content/index.ts` watches DOM mutations (debounced
 800 ms, up to 60 s) so reader sites that render late still get a panel.
 
 ## Storage
 
-| What | Where | Owner |
-| --- | --- | --- |
-| Settings | `browser.storage.local` key `settings` | background, popup, panel |
-| Captured Narrately logs | `browser.storage.local` key `debugErrors` (latest 100) | background, debug page |
-| Generated audio | IndexedDB `narrately` / `audio_cache` (extension origin, shared across sites) | host page, popup |
-| Model files | Cache API `narrately-model-v1` (extension origin) | host page, worker, popup |
-| Voice packs | Bundled in the package under `models/.../voices/` | build |
+| What                    | Where                                                                         | Owner                    |
+| ----------------------- | ----------------------------------------------------------------------------- | ------------------------ |
+| Settings                | `browser.storage.local` key `settings`                                        | background, popup, panel |
+| Captured Narrately logs | `browser.storage.local` key `debugErrors` (latest 100)                        | background, debug page   |
+| Generated audio         | IndexedDB `narrately` / `audio_cache` (extension origin, shared across sites) | host page, popup         |
+| Model files             | Cache API `narrately-model-v1` (extension origin)                             | host page, worker, popup |
+| Voice packs             | Bundled in the package under `models/.../voices/`                             | build                    |
