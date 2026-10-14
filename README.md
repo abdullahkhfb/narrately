@@ -119,6 +119,24 @@ Open them from the toolbar icon.
 - **Storage** — shows how much space narrated chapters and the voice use. **Manage**
   lets you clear narrated chapters, delete the voice, or clear everything.
 
+## Performance (Real-Time Factor)
+
+**Real-Time Factor (RTF)** is the ratio of generation time to audio length
+($\text{RTF} = \frac{\text{generation time}}{\text{audio duration}}$; lower is
+faster, and any $\text{RTF} < 1.0$ generates speech faster than real-time
+playback). Because WASM runs on a single CPU thread inside extension frames
+while WebGPU dispatches shaders to the GPU, typical uncached generation speeds
+on common hardware are:
+
+| Hardware class | Engine (`dtype`) | Typical RTF | Speed (`× realtime`) | ~10 min chapter (~9,000 chars) |
+| --- | --- | --- | --- | --- |
+| Dedicated desktop GPU (RTX 3060 / 4060+, RX 6700 XT+) | WebGPU (`fp32`) | **0.04 – 0.08** | 12× – 25× | ~25 – 50 s |
+| Apple Silicon (M1 / M2 / M3 / M4) | WebGPU (`fp32`) | **0.07 – 0.14** | 7× – 14× | ~45 – 85 s |
+| Modern integrated GPU (Intel Arc / Iris Xe, Radeon 680M/780M) | WebGPU (`fp32`) | **0.14 – 0.28** | 3.5× – 7× | ~1.5 – 3 min |
+| Modern desktop / laptop CPU (Ryzen 5/7, Core i5/i7 12th gen+, Apple M-series) | WASM (`q8`, 1 thread) | **0.45 – 0.85** | 1.2× – 2.2× | ~4.5 – 8.5 min |
+| Older / low-power laptop CPU | WASM (`q8`, 1 thread) | **0.90 – 1.40** | 0.7× – 1.1× | ~9 – 14 min |
+| Any device (cached replay) | IndexedDB cache | **< 0.005** | > 200× | < 1 s |
+
 ## Your privacy
 
 - Narrately has no analytics and no tracking.
