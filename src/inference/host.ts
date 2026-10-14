@@ -2,28 +2,32 @@
  * @fileoverview Extension-origin bridge page embedded by the content script.
  */
 
-import '../shared/webgpu';
-import {narrateChapter, type AudioChunk, type WorkerClient} from '../core/narration';
-import {installDebugErrorCapture} from '../shared/debugErrors';
-import {extensionUrl} from '../shared/extensionUrl';
+import "../shared/webgpu";
+import {
+  narrateChapter,
+  type AudioChunk,
+  type WorkerClient,
+} from "../core/narration";
+import { installDebugErrorCapture } from "../shared/debugErrors";
+import { extensionUrl } from "../shared/extensionUrl";
 import type {
   DebugErrorRecord,
   HostRequest,
   InferenceMessage,
   NarrateMessage,
   WorkerMessage,
-} from '../shared/messages';
+} from "../shared/messages";
 import {
   clearStorage,
   getStorageInfo,
   type ClearTarget,
-} from '../shared/storageManager';
-import {downloadModel, isModelInstalled} from './modelStore';
+} from "../shared/storageManager";
+import { downloadModel, isModelInstalled } from "./modelStore";
 
-installDebugErrorCapture('inference host', reportHostError);
+installDebugErrorCapture("inference host", reportHostError);
 
 function reportHostError(error: DebugErrorRecord): Promise<void> {
-  window.parent.postMessage({type: 'narrately_debug_error', error}, '*');
+  window.parent.postMessage({ type: "narrately_debug_error", error }, "*");
   return Promise.resolve();
 }
 
@@ -35,37 +39,37 @@ interface Pending {
 const pending = new Map<string, Pending>();
 const controllers = new Map<string, AbortController>();
 let workerInstance: Worker | undefined;
-let currentDevice: NarrateMessage['device'] = 'wasm';
+let currentDevice: NarrateMessage["device"] = "wasm";
 
 function getWorker(): Worker {
   if (workerInstance) {
     return workerInstance;
   }
-  const worker = new Worker(extensionUrl('src/inference_worker.js'), {
-    type: 'module',
+  const worker = new Worker(extensionUrl("src/inference_worker.js"), {
+    type: "module",
   });
-  worker.addEventListener('message', (event: MessageEvent<WorkerMessage>) => {
+  worker.addEventListener("message", (event: MessageEvent<WorkerMessage>) => {
     const message = event.data;
-    if (message.type === 'debug_error') {
+    if (message.type === "debug_error") {
       window.parent.postMessage(
-        {type: 'narrately_debug_error', error: message.error},
-        '*',
+        { type: "narrately_debug_error", error: message.error },
+        "*",
       );
-    } else if (message.type === 'result') {
+    } else if (message.type === "result") {
       pending.get(message.jobId)?.resolve({
         audio: message.audio,
         durationMs: message.durationMs,
       });
       pending.delete(message.jobId);
-    } else if (message.type === 'error' && message.jobId) {
+    } else if (message.type === "error" && message.jobId) {
       pending.get(message.jobId)?.reject(new Error(message.message));
       pending.delete(message.jobId);
     }
   });
 
-  worker.addEventListener('error', () => {
+  worker.addEventListener("error", () => {
     for (const job of pending.values()) {
-      job.reject(new Error('The inference worker crashed.'));
+      job.reject(new Error("The inference worker crashed."));
     }
     pending.clear();
     workerInstance = undefined;
@@ -80,18 +84,21 @@ const workerClient: WorkerClient = {
     const worker = getWorker();
     const jobId = crypto.randomUUID();
     return new Promise((resolve, reject) => {
-      pending.set(jobId, {resolve, reject});
+      pending.set(jobId, { resolve, reject });
       signal?.addEventListener(
-        'abort',
+        "abort",
         () => {
           if (pending.has(jobId)) {
-            worker.postMessage({type: 'cancel', jobId} satisfies InferenceMessage);
+            worker.postMessage({
+              type: "cancel",
+              jobId,
+            } satisfies InferenceMessage);
           }
         },
-        {once: true},
+        { once: true },
       );
       worker.postMessage({
-        type: 'synthesize',
+        type: "synthesize",
         jobId,
         text,
         voiceId,
@@ -102,38 +109,38 @@ const workerClient: WorkerClient = {
   },
 };
 
-window.addEventListener('message', (event: MessageEvent<unknown>) => {
+window.addEventListener("message", (event: MessageEvent<unknown>) => {
   if (event.source !== window.parent || !isHostRequest(event.data)) {
     return;
   }
-  if (event.data.type === 'cancel') {
+  if (event.data.type === "cancel") {
     controllers.get(event.data.jobId)?.abort();
     return;
   }
-  if (event.data.type === 'warmup') {
+  if (event.data.type === "warmup") {
     getWorker().postMessage({
-      type: 'warmup',
+      type: "warmup",
       device: event.data.device,
     } satisfies InferenceMessage);
     return;
   }
-  if (event.data.type === 'model_status') {
-    const {jobId} = event.data;
+  if (event.data.type === "model_status") {
+    const { jobId } = event.data;
     void isModelInstalled(event.data.device).then((installed) => {
-      send({type: 'model_status', jobId, installed});
+      send({ type: "model_status", jobId, installed });
     });
     return;
   }
-  if (event.data.type === 'storage_info') {
+  if (event.data.type === "storage_info") {
     void replyWithStorage(event.data.jobId, () => getStorageInfo());
     return;
   }
-  if (event.data.type === 'clear_storage') {
+  if (event.data.type === "clear_storage") {
     const target: ClearTarget = event.data.target;
     void replyWithStorage(event.data.jobId, () => clearStorage(target));
     return;
   }
-  if (event.data.type === 'model_download') {
+  if (event.data.type === "model_download") {
     void runModelDownload(event.data.jobId, event.data.device);
     return;
   }
@@ -145,52 +152,53 @@ async function replyWithStorage(
   action: () => Promise<Awaited<ReturnType<typeof getStorageInfo>>>,
 ): Promise<void> {
   try {
-    send({type: 'storage_info', jobId, ...(await action())});
+    send({ type: "storage_info", jobId, ...(await action()) });
   } catch (error: unknown) {
-    console.error('Storage request failed:', error);
+    console.error("Storage request failed:", error);
     send({
-      type: 'error',
+      type: "error",
       jobId,
-      message: error instanceof Error ? error.message : 'Storage request failed.',
+      message:
+        error instanceof Error ? error.message : "Storage request failed.",
     });
   }
 }
 
 async function runModelDownload(
   jobId: string,
-  device: NarrateMessage['device'],
+  device: NarrateMessage["device"],
 ): Promise<void> {
   const controller = new AbortController();
   controllers.set(jobId, controller);
   try {
     await downloadModel(
       device,
-      ({fraction, loadedBytes, totalBytes}) => {
+      ({ fraction, loadedBytes, totalBytes }) => {
         send({
-          type: 'progress',
+          type: "progress",
           jobId,
           completed: Math.round(fraction * 1000),
           total: 1000,
-          phase: 'loading',
+          phase: "loading",
           loadedBytes,
           totalBytes,
         });
       },
       controller.signal,
     );
-    send({type: 'model_status', jobId, installed: true});
+    send({ type: "model_status", jobId, installed: true });
   } catch (error: unknown) {
     if (!controller.signal.aborted) {
-      console.error('Model download failed:', error);
+      console.error("Model download failed:", error);
     }
     send({
-      type: 'error',
+      type: "error",
       jobId,
       message: controller.signal.aborted
-        ? 'Download cancelled.'
+        ? "Download cancelled."
         : error instanceof Error
           ? error.message
-          : 'Model download failed.',
+          : "Model download failed.",
     });
   } finally {
     controllers.delete(jobId);
@@ -216,18 +224,18 @@ async function runNarration(request: NarrateMessage): Promise<void> {
         signal: controller.signal,
         onProgress: (completed, total) => {
           send({
-            type: 'progress',
+            type: "progress",
             jobId: request.jobId,
             completed,
             total,
-            phase: completed < total ? 'synthesizing' : 'merging',
+            phase: completed < total ? "synthesizing" : "merging",
           });
         },
       },
     );
     send(
       {
-        type: 'result',
+        type: "result",
         jobId: request.jobId,
         audio: result.audio,
         durationMs: result.durationMs,
@@ -236,12 +244,12 @@ async function runNarration(request: NarrateMessage): Promise<void> {
     );
   } catch (error: unknown) {
     if (!controller.signal.aborted) {
-      console.error('Narration failed:', error);
+      console.error("Narration failed:", error);
     }
     send({
-      type: 'error',
-      jobId,
-      message: error instanceof Error ? error.message : 'Narration failed.',
+      type: "error",
+      jobId: request.jobId,
+      message: error instanceof Error ? error.message : "Narration failed.",
     });
   } finally {
     controllers.delete(request.jobId);
@@ -249,21 +257,21 @@ async function runNarration(request: NarrateMessage): Promise<void> {
 }
 
 function send(message: WorkerMessage, transfer: Transferable[] = []): void {
-  window.parent.postMessage(message, '*', transfer);
+  window.parent.postMessage(message, "*", transfer);
 }
 
 function isHostRequest(message: unknown): message is HostRequest {
-  if (typeof message !== 'object' || message === null) {
+  if (typeof message !== "object" || message === null) {
     return false;
   }
-  const type = (message as {type?: unknown}).type;
+  const type = (message as { type?: unknown }).type;
   return (
-    type === 'narrate' ||
-    type === 'cancel' ||
-    type === 'model_status' ||
-    type === 'storage_info' ||
-    type === 'clear_storage' ||
-    type === 'model_download' ||
-    type === 'warmup'
+    type === "narrate" ||
+    type === "cancel" ||
+    type === "model_status" ||
+    type === "storage_info" ||
+    type === "clear_storage" ||
+    type === "model_download" ||
+    type === "warmup"
   );
 }
