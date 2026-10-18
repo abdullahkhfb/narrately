@@ -9,6 +9,24 @@ natural-sounding voice.
 > [!WARNING]
 > **Beta software.** Expect bugs; feedback is welcome.
 
+<p>
+  <a href="https://addons.mozilla.org/en-US/firefox/addon/narrately/"><img src="docs/assets/install-firefox.svg" alt="Install Narrately for Firefox" height="48"></a>
+</p>
+
+**Contents:** [Why](#why-narrately) ·
+[Sites](#supported-websites) ·
+[Install](#install) ·
+[Setup](#first-time-setup-download-the-voice) ·
+[Usage](#how-to-use-it) ·
+[Voices](#voices) ·
+[Settings](#settings) ·
+[Performance](#performance-real-time-factor) ·
+[Privacy](#your-privacy) ·
+[Screenshots](#screenshots) ·
+[Help](#something-wrong) ·
+[Developers](#for-developers) ·
+[License](#license)
+
 ## Why Narrately?
 
 - **Private.** The voice runs on your computer. The text you read is never sent anywhere.
@@ -36,16 +54,28 @@ Developers can add one by following
 
 ## Install
 
-You install Narrately from this project's **Releases** page.
+### Firefox
+
+[**Install from Firefox Add-ons**](https://addons.mozilla.org/en-US/firefox/addon/narrately/) and click **Add to Firefox**.
+Updates arrive automatically.
+
+**Requirements:** desktop Firefox 140 or newer. Firefox for Android is not
+supported yet.
 
 ### Chrome (also Edge and Brave)
 
-1. Open the **Releases** page of this project and download the file ending in `-chrome.zip`.
+Install it manually from this project's **Releases** page:
+
+1. Download the file ending in `-chrome.zip`.
 2. Unzip it into a folder you will keep (Chrome reads the add-on from that folder, so don't delete it).
 3. Go to `chrome://extensions` and turn on **Developer mode** (top right).
 4. Click **Load unpacked** and choose the unzipped folder.
 
-### Firefox
+**Requirements:** Chrome 121 or newer.
+
+### Firefox, from a release file (optional)
+
+To try a build that is not on Firefox Add-ons yet:
 
 1. Download the file ending in `-firefox.zip` from the **Releases** page and unzip it.
 2. Go to `about:debugging#/runtime/this-firefox`.
@@ -53,9 +83,6 @@ You install Narrately from this project's **Releases** page.
 
 Firefox removes temporary add-ons when it closes, so you will need to repeat these
 steps after restarting Firefox.
-
-**Requirements:** Chrome 121 or newer, or desktop Firefox 140 or newer.
-Firefox for Android is not supported yet.
 
 ## First-time setup: download the voice
 
@@ -175,7 +202,7 @@ data. Only the browser APIs and the voice model are stubbed; the markup and styl
 | "Narrately cannot run here" | Reload the page. Browser settings pages can't be narrated. |
 | The first narration is slow | Normal. The voice loads once; later chapters start faster. |
 | The download fails or stops | Click **Retry download**. A partly downloaded file is never used. |
-| Firefox lost the add-on | Temporary add-ons disappear on restart. Load it again. |
+| Firefox lost the add-on | Temporary add-ons disappear on restart. Install it from [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/narrately/) instead, or load it again. |
 
 Still stuck? Open an issue on this project's page and tell us your browser and
 what you saw.

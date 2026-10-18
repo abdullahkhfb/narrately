@@ -60,6 +60,7 @@ reasoned about on its own.
 | `.github/workflows/release-verify.yml` | Reusable (`workflow_call`) | `cargo test --workspace` and `npm run typecheck` |
 | `.github/workflows/release-package.yml` | Reusable | Builds Chrome and Firefox, zips them with the source archive, writes `SHA256SUMS.txt`, uploads a workflow artifact |
 | `.github/workflows/release-publish.yml` | Reusable | Downloads the artifact, attaches it to the release, marks betas as pre-release |
+| `.github/workflows/submit-firefox.yml` | Separate workflow | After a successful release build, submits the Firefox package and source archive to addons.mozilla.org (Chromium is a planned stub) |
 | `.github/actions/setup-toolchain/action.yml` | Composite action | Node 22, Rust with the wasm32 target, caches, `npm ci` |
 
 ```mermaid
@@ -106,6 +107,29 @@ Design points:
 2. Add a job to `release.yml` that `uses:` it and declares `needs:`.
 3. Share repeated setup in a composite action under `.github/actions/`. Composite steps that run shell code need `shell: bash`.
 4. Lint with [actionlint](https://github.com/rhysd/actionlint): `actionlint .github/workflows/*.yml`.
+
+## Store submission
+
+`submit-firefox.yml` runs on its own after **Release build** succeeds for a
+published release. It downloads `narrately-<version>-firefox.zip` and
+`narrately-<version>-src.zip` from the GitHub release and submits them to the
+[Firefox listing](https://addons.mozilla.org/en-US/firefox/addon/narrately/)
+through the AMO API: upload, wait for automatic validation, then create the
+new version with the source archive and build notes attached for the reviewers.
+Mozilla still reviews every version before it goes live.
+
+**One-time setup:** create API credentials at
+<https://addons.mozilla.org/developers/addon/api/key/> and add them as the
+repository secrets `AMO_JWT_ISSUER` and `AMO_JWT_SECRET`.
+
+**Retry or re-submit:** run the workflow manually from the Actions tab
+(**Submit to Firefox**, *Run workflow*) and enter an existing tag. AMO
+refuses a version number it already has, so a retry only helps when the earlier
+submission failed before the version was created.
+
+Chromium (Chrome Web Store, Edge Add-ons) is planned. The workflow contains a
+commented-out `chromium` job that already downloads the `-chrome.zip` from the
+release; it only needs the store upload step and credentials.
 
 ## Local build
 

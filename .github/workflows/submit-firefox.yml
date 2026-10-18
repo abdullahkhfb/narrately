@@ -1,0 +1,173 @@
+name: Submit to Firefox
+on:
+  workflow_run:
+    workflows: ["Release build"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to submit."
+        required: true
+
+# Only reads the release assets; nothing is written to the repository.
+permissions:
+  contents: read
+
+concurrency:
+  group: submit-firefox-${{ github.event.workflow_run.head_branch || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  meta:
+    name: Resolve tag and version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Automatic runs: only for a successful run that was started by a published
+    # release (for those, head_branch holds the tag). Manual runs always pass.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'release')
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      version: ${{ steps.resolve.outputs.version }}
+    env:
+      TAG: ${{ github.event.workflow_run.head_branch || inputs.tag }}
+    steps:
+      - name: Validate tag and derive version
+        id: resolve
+        run: |
+          VERSION="${TAG#v}"
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$ ]]; then
+            echo "::error::Tag '$TAG' must look like v1.2.3 or v1.2.3-beta.4"
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+  firefox:
+    name: Firefox (addons.mozilla.org)
+    needs: meta
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TAG: ${{ needs.meta.outputs.tag }}
+      VERSION: ${{ needs.meta.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+      AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+      AMO_ADDON: narrately
+      AMO_API: https://addons.mozilla.org/api/v5
+    steps:
+      - name: Check credentials
+        run: |
+          if [[ -z "$AMO_JWT_ISSUER" || -z "$AMO_JWT_SECRET" ]]; then
+            echo "::error::Add the AMO_JWT_ISSUER and AMO_JWT_SECRET repository secrets."
+            exit 1
+          fi
+
+      - name: Download release assets
+        run: |
+          mkdir -p release
+          gh release download "$TAG" --dir release \
+            --pattern "narrately-${VERSION}-firefox.zip" \
+            --pattern "narrately-${VERSION}-src.zip"
+          ls -la release
+
+      - name: Upload, validate and submit to AMO
+        run: |
+          set -euo pipefail
+
+          # AMO API auth: a short-lived HS256 JWT, minted fresh for every call.
+          jwt() {
+            node --input-type=commonjs -e '
+              const c = require("node:crypto");
+              const enc = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
+              const now = Math.floor(Date.now() / 1000);
+              const head = enc({alg: "HS256", typ: "JWT"});
+              const body = enc({
+                iss: process.env.AMO_JWT_ISSUER,
+                jti: c.randomUUID(),
+                iat: now,
+                exp: now + 60,
+              });
+              const sig = c.createHmac("sha256", process.env.AMO_JWT_SECRET)
+                .update(`${head}.${body}`).digest("base64url");
+              process.stdout.write(`${head}.${body}.${sig}`);
+            '
+          }
+
+          # 1. Upload the extension package to the listed channel.
+          curl --silent --show-error --fail-with-body \
+            -H "Authorization: JWT $(jwt)" \
+            -F "channel=listed" \
+            -F "upload=@release/narrately-${VERSION}-firefox.zip" \
+            "$AMO_API/addons/upload/" > upload.json
+          UUID="$(jq -r .uuid upload.json)"
+          echo "Upload UUID: $UUID"
+
+          # 2. Wait for AMO's automatic validation to finish.
+          for i in $(seq 1 60); do
+            curl --silent --show-error --fail-with-body \
+              -H "Authorization: JWT $(jwt)" \
+              "$AMO_API/addons/upload/$UUID/" > status.json
+            if [[ "$(jq -r .processed status.json)" == "true" ]]; then
+              break
+            fi
+            echo "Validating... ($i/60)"
+            sleep 10
+          done
+          if [[ "$(jq -r .processed status.json)" != "true" ]]; then
+            echo "::error::AMO did not finish validating the upload in time."
+            exit 1
+          fi
+          if [[ "$(jq -r .valid status.json)" != "true" ]]; then
+            echo "::error::AMO rejected the upload. Validation report:"
+            jq .validation status.json
+            exit 1
+          fi
+
+          # 3. Create the new version, attaching the source for human review.
+          NOTES="Built from the attached source archive (also at https://github.com/${GH_REPO}/releases/tag/${TAG}). Requirements: Node.js 22, Rust (stable) with the wasm32-unknown-unknown target. Steps: npm ci && npm run package:firefox. The output is release/firefox. Full details are in docs/building.md. The speech model is not bundled; users download it from the extension UI."
+          curl --silent --show-error --fail-with-body \
+            -H "Authorization: JWT $(jwt)" \
+            -F "upload=$UUID" \
+            -F "source=@release/narrately-${VERSION}-src.zip" \
+            -F "approval_notes=$NOTES" \
+            "$AMO_API/addons/addon/$AMO_ADDON/versions/" > version.json
+          echo "Submitted version $(jq -r .version version.json) to AMO."
+          {
+            echo "### Firefox submission"
+            echo "Version \`$(jq -r .version version.json)\` was submitted from tag \`$TAG\`."
+            echo "Review status: https://addons.mozilla.org/en-US/developers/addon/$AMO_ADDON/versions"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  # Planned: Chromium (Chrome Web Store, Edge Add-ons).
+  #
+  # The release build already produces narrately-<version>-chrome.zip, so only
+  # the upload step is missing. To enable it, add the store credentials as
+  # secrets, uncomment this job and adapt it (for example with
+  # chrome-webstore-upload-cli). Keep it independent of `firefox` so one store
+  # failing never blocks the other.
+  #
+  # chromium:
+  #   name: Chromium (Chrome Web Store)
+  #   needs: meta
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 30
+  #   env:
+  #     TAG: ${{ needs.meta.outputs.tag }}
+  #     VERSION: ${{ needs.meta.outputs.version }}
+  #     GH_TOKEN: ${{ github.token }}
+  #     GH_REPO: ${{ github.repository }}
+  #   steps:
+  #     - name: Download release assets
+  #       run: |
+  #         mkdir -p release
+  #         gh release download "$TAG" --dir release \
+  #           --pattern "narrately-${VERSION}-chrome.zip"
+  #     - name: Upload and publish
+  #       run: echo "TODO: upload release/narrately-${VERSION}-chrome.zip to the store"
+  # ---------------------------------------------------------------------------
