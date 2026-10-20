@@ -79,6 +79,12 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Pasted secrets often carry a trailing newline or space, which AMO
+          # reports as a 401. Strip all whitespace before signing.
+          AMO_JWT_ISSUER="$(printf '%s' "$AMO_JWT_ISSUER" | tr -d '[:space:]')"
+          AMO_JWT_SECRET="$(printf '%s' "$AMO_JWT_SECRET" | tr -d '[:space:]')"
+          export AMO_JWT_ISSUER AMO_JWT_SECRET
+
           # AMO API auth: a short-lived HS256 JWT, minted fresh for every call.
           jwt() {
             node --input-type=commonjs -e '
@@ -103,7 +109,11 @@ jobs:
             -H "Authorization: JWT $(jwt)" \
             -F "channel=listed" \
             -F "upload=@release/narrately-${VERSION}-firefox.zip" \
-            "$AMO_API/addons/upload/" > upload.json
+            "$AMO_API/addons/upload/" > upload.json || {
+              echo "::error::AMO upload request failed. Response:"
+              cat upload.json
+              exit 1
+            }
           UUID="$(jq -r .uuid upload.json)"
           echo "Upload UUID: $UUID"
 
@@ -135,7 +145,11 @@ jobs:
             -F "upload=$UUID" \
             -F "source=@release/narrately-${VERSION}-src.zip" \
             -F "approval_notes=$NOTES" \
-            "$AMO_API/addons/addon/$AMO_ADDON/versions/" > version.json
+            "$AMO_API/addons/addon/$AMO_ADDON/versions/" > version.json || {
+              echo "::error::AMO version request failed. Response:"
+              cat version.json
+              exit 1
+            }
           echo "Submitted version $(jq -r .version version.json) to AMO."
           {
             echo "### Firefox submission"

@@ -38,10 +38,6 @@ export function manifestFor(base, target, packageVersion) {
         strict_min_version: '140.0',
         data_collection_permissions: {required: ['none']},
       },
-      // Desktop only: without this key Firefox for Android falls back to the
-      // `gecko` values above and would accept the add-on. An unreachable minimum
-      // version marks it incompatible there.
-      gecko_android: {strict_min_version: '999.0'},
     };
   }
   return manifest;

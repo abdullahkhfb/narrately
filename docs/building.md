@@ -107,8 +107,6 @@ flowchart LR
 - Firefox declares `data_collection_permissions.required: ["none"]` because
   the extension does not collect or transmit user data; model files are fetched
   from Hugging Face, while page text and narration are processed locally.
-- The Firefox manifest sets `gecko_android.strict_min_version` to an unreachable
-  value so the add-on is treated as incompatible with Firefox for Android.
 - Firefox 140 is the minimum version, matching support for
   `data_collection_permissions`.
 
