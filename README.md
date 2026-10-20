@@ -59,8 +59,7 @@ Developers can add one by following
 [**Install from Firefox Add-ons**](https://addons.mozilla.org/en-US/firefox/addon/narrately/) and click **Add to Firefox**.
 Updates arrive automatically.
 
-**Requirements:** desktop Firefox 140 or newer. Firefox for Android is not
-supported yet.
+**Requirements:** Firefox 140 or newer.
 
 ### Chrome (also Edge and Brave)
 

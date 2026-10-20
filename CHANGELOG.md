@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.0-beta.5
+
+- Fixed narration failing for the rest of the session after a WebGPU device loss (for example `Out of Memory`). The engine is now rebuilt on a fresh device and the failed chunk is retried once (`src/inference/kokoro.ts`).
+- On WebGPU, Narrately now requests the high-performance adapter and logs which GPU was selected. `powerPreference` is no longer stripped on Firefox, only on Chromium for Windows (`src/shared/webgpu.ts`).
+- Firefox manifest now marks the add-on incompatible with Firefox for Android (`gecko_android` in `scripts/manifest.mjs`); removed the related notes from the README and build docs.
+
 ## 0.1.0-beta.4
 
 - Optimized the Rust chunking algorithm (`crates/narrately-core/src/chunker.rs` and `lib.rs`) with zero-copy `Cow<'_, str>` slice borrowing, denser sentence/word packing across paragraph boundaries, punctuation and quote grouping, and UTF-8 character-boundary splitting.

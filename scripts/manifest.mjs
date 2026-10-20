@@ -4,7 +4,7 @@
  * - Chrome rejects `background.scripts` in MV3, while Firefox does not run
  *   `background.service_worker`, so each target gets only its own key.
  * - Browsers only accept numeric `version` strings, so a pre-release such as
- *   `0.1.0-beta.4` becomes version `0.1.0.4` plus a human-readable
+ *   `0.1.0-beta.5` becomes version `0.1.0.5` plus a human-readable
  *   `version_name` (Chrome shows it; Firefox does not support the key).
  */
 
@@ -38,6 +38,10 @@ export function manifestFor(base, target, packageVersion) {
         strict_min_version: '140.0',
         data_collection_permissions: {required: ['none']},
       },
+      // Desktop only: without this key Firefox for Android falls back to the
+      // `gecko` values above and would accept the add-on. An unreachable minimum
+      // version marks it incompatible there.
+      gecko_android: {strict_min_version: '999.0'},
     };
   }
   return manifest;

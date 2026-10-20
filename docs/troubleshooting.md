@@ -24,6 +24,7 @@
 | Model download ends with "Checksum mismatch… discarded" | Corrupt transfer; retry. Nothing was stored |
 | Generate fails with `Blocked remote inference request` | A dependency tried to reach the network. The guard is working: inspect the URL in the message and report it |
 | `The powerPreference option is currently ignored when calling requestAdapter() on Windows` (`crbug.com/369219127`) | Older builds allowed ONNX Runtime's Emscripten WebGPU bindings to pass `powerPreference` to `navigator.gpu.requestAdapter()`, triggering a Chromium Windows notice. `src/shared/webgpu.ts` strips `powerPreference` before calling `requestAdapter()`; rebuild with `npm run build:ts` and reload the extension |
+| WebGPU `Out of Memory`, then `Invalid buffer` on every chunk | The GPU device was lost, often because Firefox picked an integrated GPU. Narrately now rebuilds the engine and retries once. Open **Debug** and check the `WebGPU adapter` line to see which GPU was used; if it is still too small, switch the engine to WASM in settings |
 | First generation is slow | Expected. The model loads into an ONNX Runtime session once per page; later runs reuse it and the chunk cache |
 | Replaying a chapter is not instant | Cache is turned off in settings, or the voice or speed changed (both are part of the cache key) |
 | Switching to WebGPU asks for another download | WebGPU uses a separate full-precision model (about 312 MB) |

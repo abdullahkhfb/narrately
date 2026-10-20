@@ -31,7 +31,13 @@ function isWindowsPlatform(): boolean {
   return /win/i.test(platform) || /windows/i.test(nav.userAgent);
 }
 
-const STRIP_POWER_PREFERENCE = isWindowsPlatform();
+function isFirefox(): boolean {
+  return typeof navigator !== 'undefined' && /firefox/i.test(navigator.userAgent);
+}
+
+// The crbug warning is Chromium-only. Firefox needs the hint so it can pick the
+// discrete GPU on hybrid-graphics laptops.
+const STRIP_POWER_PREFERENCE = isWindowsPlatform() && !isFirefox();
 
 function sanitizeOptions(
   options: AdapterOptions | undefined,

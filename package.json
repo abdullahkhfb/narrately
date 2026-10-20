@@ -1,6 +1,6 @@
 {
   "name": "narrately",
-  "version": "0.1.0-beta.4",
+  "version": "0.1.0-beta.5",
   "private": true,
   "description": "Local-first novel narration extension for Chrome and Firefox using Kokoro-82M, TypeScript, and a Rust/WASM core.",
   "type": "module",

@@ -66,6 +66,34 @@ function installLocalFetchGuard(): void {
   fetchGuardInstalled = true;
 }
 
+/** Asks WebGPU for the high-performance adapter and tells ONNX Runtime to use it. */
+async function selectHighPerformanceAdapter(): Promise<void> {
+  const nav = navigator as Navigator & {
+    gpu?: {requestAdapter(options?: Record<string, unknown>): Promise<unknown>};
+  };
+  const webgpuEnv = env.backends.onnx.webgpu as
+    | {powerPreference?: string; adapter?: unknown}
+    | undefined;
+  if (!webgpuEnv || !nav.gpu) {
+    return;
+  }
+  webgpuEnv.powerPreference = 'high-performance';
+  try {
+    const adapter = (await nav.gpu.requestAdapter({
+      powerPreference: 'high-performance',
+    })) as {info?: Record<string, unknown>} | null;
+    if (adapter) {
+      webgpuEnv.adapter = adapter;
+      const info = adapter.info ?? {};
+      console.warn(
+        `[narrately] WebGPU adapter: ${String(info.vendor ?? '?')} ${String(info.architecture ?? '')} ${String(info.description ?? info.device ?? '')}`.trim(),
+      );
+    }
+  } catch (error: unknown) {
+    console.warn('[narrately] Could not pre-select a WebGPU adapter:', error);
+  }
+}
+
 /** Loads Kokoro from extension-local model assets. */
 export async function loadKokoro(
   device: InferenceDevice,
@@ -90,6 +118,9 @@ export async function loadKokoro(
   env.allowLocalModels = true;
   env.localModelPath = extensionUrl('models/');
   installLocalFetchGuard();
+  if (device === 'webgpu') {
+    await selectHighPerformanceAdapter();
+  }
   const loaded = await KokoroTTS.from_pretrained(MODEL_ID, {
     dtype: device === 'webgpu' ? 'fp32' : 'q8',
     device,
@@ -102,6 +133,24 @@ export async function loadKokoro(
   });
   instance = loaded;
   loadedDevice = device;
+}
+
+/**
+ * Drops the current engine so the next call rebuilds it. A lost WebGPU device
+ * (e.g. out of memory) leaves the ONNX session permanently invalid, and
+ * `loadKokoro` would otherwise keep reusing it.
+ */
+async function resetEngine(): Promise<void> {
+  const broken = instance as unknown as
+    | {model?: {dispose?: () => Promise<void> | void}}
+    | undefined;
+  instance = undefined;
+  loadedDevice = undefined;
+  try {
+    await broken?.model?.dispose?.();
+  } catch {
+    // The device is already lost; releasing the session is best effort.
+  }
 }
 
 const WARMUP_TEXTS = [
@@ -125,6 +174,7 @@ export async function warmupKokoro(
     }
   } catch (error: unknown) {
     console.warn('Kokoro warmup run failed:', error);
+    await resetEngine();
   }
 }
 
@@ -141,10 +191,29 @@ export async function synthesizeLocal(
   }
 
   const started = performance.now();
-  const result = await instance.generate(text, {
-    voice: voiceId as KokoroVoiceId,
-    speed,
-  });
+  let result: Awaited<ReturnType<KokoroInstance['generate']>>;
+  try {
+    result = await instance.generate(text, {
+      voice: voiceId as KokoroVoiceId,
+      speed,
+    });
+  } catch (error: unknown) {
+    await resetEngine();
+    if (device !== 'webgpu') {
+      throw error;
+    }
+    // The GPU device was lost. Rebuild the engine on a fresh device and retry
+    // this chunk once; later chunks then run normally.
+    console.warn('WebGPU inference failed; reloading engine and retrying:', error);
+    await loadKokoro(device, () => {});
+    if (!instance) {
+      throw error;
+    }
+    result = await instance.generate(text, {
+      voice: voiceId as KokoroVoiceId,
+      speed,
+    });
+  }
   const data = result.audio as Float32Array;
   const audio = float32ToWav(data, SAMPLE_RATE);
   const elapsed = performance.now() - started;
